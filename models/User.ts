@@ -8,6 +8,7 @@ export interface IUser extends Document {
   eventbriteId?: string;
   tempPassword?: string;
   passwordChanged: boolean;
+  status?: 'registered' | 'checked_in' | 'checked_out';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,11 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  status: {
+    type: String,
+    enum: ['registered', 'checked_in', 'checked_out'],
+    default: 'registered'
+  }
 }, {
   timestamps: true,
 });
