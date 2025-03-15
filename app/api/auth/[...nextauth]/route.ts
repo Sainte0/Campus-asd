@@ -25,7 +25,7 @@ declare module 'next-auth/jwt' {
   }
 }
 
-const config = {
+export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -83,8 +83,8 @@ const config = {
     signIn: '/',
     error: '/'
   }
-} satisfies AuthOptions;
+};
 
-const handler = NextAuth(config);
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST }; 
