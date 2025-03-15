@@ -1,47 +1,72 @@
-import { AuthOptions } from 'next-auth';
+import type { NextAuthOptions, DefaultSession } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
-import User from '@/models/User';
+import User, { IUser } from '@/models/User';
+import { Types } from 'mongoose';
 
-export const authOptions: AuthOptions = {
+// Extender los tipos de NextAuth
+declare module "next-auth" {
+  interface User {
+    role: string;
+    documento: string;
+  }
+  interface Session {
+    user: {
+      role: string;
+      documento: string;
+    } & DefaultSession["user"]
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    role: string;
+    documento: string;
+  }
+}
+
+export const options: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        documento: { label: "Documento", type: "text" }
       },
       async authorize(credentials) {
+        if (!credentials?.email || !credentials?.documento) {
+          console.log('❌ Faltan credenciales');
+          return null;
+        }
+
         try {
-          if (!credentials?.email || !credentials?.password) {
-            return null;
-          }
-
           await connectDB();
-
-          const user = await User.findOne({ email: credentials.email })
-            .select('+password')
-            .lean();
-
-          if (!user || !user.password) {
+          
+          const user = await User.findOne({ email: credentials.email }) as IUser | null;
+          
+          if (!user) {
+            console.log('❌ Usuario no encontrado:', credentials.email);
             return null;
           }
 
-          const isValid = await bcrypt.compare(credentials.password, user.password);
-
+          // Verificar que el documento coincida
+          const isValid = await bcrypt.compare(credentials.documento, user.password);
+          
           if (!isValid) {
+            console.log('❌ Documento inválido para el usuario:', credentials.email);
             return null;
           }
 
           return {
-            id: user._id.toString(),
+            id: (user._id as Types.ObjectId).toString(),
             email: user.email,
             name: user.name,
-            role: user.role
+            role: user.role,
+            documento: user.documento
           };
         } catch (error) {
-          console.error('Error en autenticación:', error);
+          console.error('❌ Error en autenticación:', error);
           return null;
         }
       }
@@ -50,30 +75,24 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
         token.role = user.role;
+        token.documento = user.documento;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.name = token.name;
+      if (session?.user) {
         session.user.role = token.role;
+        session.user.documento = token.documento;
       }
       return session;
     }
   },
   pages: {
-    signIn: '/',
-    error: '/'
+    signIn: '/login',
   },
   session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60 // 30 days
+    strategy: 'jwt',
   },
-  secret: process.env.NEXTAUTH_SECRET
+  secret: process.env.NEXTAUTH_SECRET,
 }; 

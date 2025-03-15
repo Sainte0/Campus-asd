@@ -6,8 +6,7 @@ export interface IUser extends Document {
   name: string;
   role: 'student' | 'admin';
   eventbriteId?: string;
-  tempPassword?: string;
-  passwordChanged: boolean;
+  documento: string;
   status?: 'registered' | 'checked_in' | 'checked_out';
   createdAt: Date;
   updatedAt: Date;
@@ -26,7 +25,6 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
-    select: false, // No incluir por defecto en las consultas
   },
   role: {
     type: String,
@@ -37,12 +35,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     sparse: true,
   },
-  tempPassword: {
+  documento: {
     type: String,
-  },
-  passwordChanged: {
-    type: Boolean,
-    default: false,
+    required: true,
+    unique: true,
   },
   status: {
     type: String,
