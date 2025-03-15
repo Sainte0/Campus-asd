@@ -29,6 +29,19 @@ export default function Home() {
         setError('Credenciales inválidas');
         return;
       }
+
+      // Obtener la sesión actualizada
+      const response = await fetch('/api/auth/session');
+      const session = await response.json();
+
+      // Redirigir según el rol
+      if (session?.user?.role === 'admin') {
+        router.push('/admin/dashboard');
+      } else if (session?.user?.role === 'student') {
+        router.push('/student');
+      } else {
+        setError('Rol de usuario no válido');
+      }
     } catch (error) {
       setError('Error al iniciar sesión');
     } finally {
@@ -36,15 +49,15 @@ export default function Home() {
     }
   };
 
-  const handleRoleChange = async () => {
-    if (session) {
-      // Si hay una sesión activa, cerrarla primero
-      await signOut({ redirect: false });
+  const handleRoleChange = () => {
+    if (!isStudent) {
+      router.push('/admin');
+    } else {
+      setIsStudent(!isStudent);
+      setEmail('');
+      setPassword('');
+      setError('');
     }
-    setIsStudent(!isStudent);
-    setEmail('');
-    setPassword('');
-    setError('');
   };
 
   return (
