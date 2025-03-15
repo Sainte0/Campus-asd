@@ -35,7 +35,10 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         try {
+          console.log('Iniciando autenticación para:', credentials?.email);
+          
           if (!credentials?.email || !credentials?.password) {
+            console.log('Credenciales incompletas');
             throw new Error('Por favor ingrese email y contraseña');
           }
 
@@ -45,12 +48,16 @@ export const authOptions: AuthOptions = {
           
           while (retries > 0) {
             try {
+              console.log(`Intento de conexión a MongoDB (intentos restantes: ${retries})`);
               await connectDB();
+              console.log('Conexión a MongoDB exitosa');
               break;
             } catch (error) {
               lastError = error;
               retries--;
+              console.error(`Error en intento de conexión:`, error);
               if (retries > 0) {
+                console.log('Esperando antes del siguiente intento...');
                 await new Promise(resolve => setTimeout(resolve, 1000));
               }
             }
@@ -61,22 +68,27 @@ export const authOptions: AuthOptions = {
             throw new Error('Error de conexión con la base de datos');
           }
 
+          console.log('Buscando usuario en la base de datos...');
           const user = await User.findOne({ email: credentials.email })
             .select('+password')
-            .exec() as IUser | null;
+            .exec() as IUser;
 
           if (!user) {
+            console.log('Usuario no encontrado:', credentials.email);
             throw new Error('Usuario no encontrado');
           }
 
+          console.log('Usuario encontrado, verificando contraseña...');
           const isValid = await bcrypt.compare(credentials.password, user.password);
 
           if (!isValid) {
+            console.log('Contraseña incorrecta para:', credentials.email);
             throw new Error('Contraseña incorrecta');
           }
 
+          console.log('Autenticación exitosa para:', credentials.email);
           return {
-            id: (user._id as Types.ObjectId).toString(),
+            id: (user as IUser)._id.toString(),
             email: user.email,
             name: user.name,
             role: user.role
@@ -110,5 +122,5 @@ export const authOptions: AuthOptions = {
     signIn: '/',
     error: '/'
   },
-  debug: process.env.NODE_ENV === 'development'
+  debug: true
 }; 
