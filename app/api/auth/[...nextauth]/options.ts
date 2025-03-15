@@ -5,7 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User, { IUser } from '@/models/User';
-import { Types } from 'mongoose';
+import { Document } from 'mongoose';
 
 declare module 'next-auth' {
   interface CustomUser extends AuthUser {
@@ -69,17 +69,23 @@ export const authOptions: AuthOptions = {
           }
 
           console.log('Buscando usuario en la base de datos...');
-          const user = await User.findOne({ email: credentials.email })
+          const userDoc = await User.findOne({ email: credentials.email })
             .select('+password')
-            .exec() as IUser;
+            .lean()
+            .exec();
 
-          if (!user) {
+          if (!userDoc) {
             console.log('Usuario no encontrado:', credentials.email);
             throw new Error('Usuario no encontrado');
           }
 
+          // Asegurarnos de que userDoc tiene la estructura correcta
+          if (!userDoc._id || !userDoc.email || !userDoc.name || !userDoc.role || !userDoc.password) {
+            throw new Error('Datos de usuario inválidos');
+          }
+
           console.log('Usuario encontrado, verificando contraseña...');
-          const isValid = await bcrypt.compare(credentials.password, user.password);
+          const isValid = await bcrypt.compare(credentials.password, userDoc.password);
 
           if (!isValid) {
             console.log('Contraseña incorrecta para:', credentials.email);
@@ -88,10 +94,10 @@ export const authOptions: AuthOptions = {
 
           console.log('Autenticación exitosa para:', credentials.email);
           return {
-            id: (user as IUser)._id.toString(),
-            email: user.email,
-            name: user.name,
-            role: user.role
+            id: userDoc._id.toString(),
+            email: userDoc.email,
+            name: userDoc.name,
+            role: userDoc.role
           };
         } catch (error) {
           console.error('Error en autenticación:', error);
