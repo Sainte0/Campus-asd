@@ -1,49 +1,33 @@
 import mongoose from 'mongoose';
 
-declare global {
-  var mongoose: { conn: any; promise: any } | undefined
-}
-
 if (!process.env.MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env');
+  throw new Error('Por favor define MONGODB_URI en las variables de entorno');
 }
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-let cached = global.mongoose || { conn: null, promise: null };
-
-if (!global.mongoose) {
-  global.mongoose = cached;
-}
+const options = {
+  bufferCommands: false,
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4
+};
 
 async function connectDB() {
   try {
-    if (cached.conn) {
-      return cached.conn;
+    if (mongoose.connection.readyState === 1) {
+      console.log('Usando conexión existente a MongoDB');
+      return mongoose.connection;
     }
 
-    const opts = {
-      bufferCommands: false,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 60000,
-      connectTimeoutMS: 30000,
-      keepAlive: true,
-      keepAliveInitialDelay: 300000
-    };
-
-    if (!cached.promise) {
-      mongoose.set('strictQuery', true);
-      cached.promise = mongoose.connect(MONGODB_URI, opts);
-    }
-
-    cached.conn = await cached.promise;
-    console.log('MongoDB connected successfully');
-    return cached.conn;
-  } catch (e) {
-    cached.promise = null;
-    console.error('Error connecting to MongoDB:', e);
-    throw e;
+    console.log('Estableciendo nueva conexión a MongoDB...');
+    await mongoose.connect(MONGODB_URI, options);
+    console.log('Conexión a MongoDB establecida exitosamente');
+    return mongoose.connection;
+  } catch (error) {
+    console.error('Error al conectar con MongoDB:', error);
+    throw error;
   }
 }
 
