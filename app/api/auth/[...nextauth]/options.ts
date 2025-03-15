@@ -47,60 +47,33 @@ export const authOptions: AuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials): Promise<AuthUser | null> {
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
         try {
-          if (!credentials) {
-            throw new Error('No se proporcionaron credenciales');
-          }
-
-          const { email, password } = credentials as Credentials;
-          
-          if (!email || !password) {
-            console.log('Credenciales incompletas');
-            throw new Error('Por favor ingrese email y contraseña');
-          }
-
-          console.log('Iniciando autenticación para:', email);
-
           await connectDB();
-          console.log('Conexión a MongoDB exitosa');
-
-          const userDoc = await User.findOne({ email })
+          
+          const user = await User.findOne({ email: credentials.email })
             .select('+password')
-            .lean()
-            .exec();
+            .lean();
 
-          if (!userDoc) {
-            console.log('Usuario no encontrado:', email);
+          if (!user || !user.password) {
             return null;
           }
 
-          // Asegurarnos de que userDoc tiene la estructura correcta
-          if (!userDoc._id || !userDoc.email || !userDoc.name || !userDoc.role || !userDoc.password) {
-            console.log('Datos de usuario inválidos');
-            return null;
-          }
-
-          console.log('Usuario encontrado, verificando contraseña...');
-          const isValid = await bcrypt.compare(password, userDoc.password);
+          const isValid = await bcrypt.compare(credentials.password, user.password);
 
           if (!isValid) {
-            console.log('Contraseña incorrecta para:', email);
             return null;
           }
 
-          console.log('Autenticación exitosa para:', email);
-
-          // Asegurarse de que el _id es una cadena
-          const userId = userDoc._id instanceof Types.ObjectId 
-            ? userDoc._id.toString() 
-            : String(userDoc._id);
-
           return {
-            id: userId,
-            email: userDoc.email,
-            name: userDoc.name,
-            role: userDoc.role
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role
           };
         } catch (error) {
           console.error('Error en autenticación:', error);
@@ -116,19 +89,15 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
         token.role = user.role;
+        token.id = user.id;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.name = token.name;
         session.user.role = token.role;
+        session.user.id = token.id;
       }
       return session;
     }

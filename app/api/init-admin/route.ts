@@ -22,24 +22,20 @@ export async function GET() {
     };
 
     console.log('Buscando admin existente...');
-    const existingAdmin = await User.findOne({ email: adminData.email });
-
     let admin;
-    if (existingAdmin) {
-      console.log('Actualizando admin existente...');
+    try {
       admin = await User.findOneAndUpdate(
         { email: adminData.email },
         { ...adminData },
-        { new: true }
+        { upsert: true, new: true }
       );
-    } else {
-      console.log('Creando nuevo admin...');
-      admin = await User.create(adminData);
+      console.log('Admin creado/actualizado:', admin.email);
+    } catch (error) {
+      console.error('Error al crear/actualizar admin:', error);
+      throw new Error('Error al crear/actualizar admin');
     }
 
-    console.log('Admin creado/actualizado:', admin);
-
-    // También crear un usuario estudiante de prueba
+    // Crear usuario estudiante de prueba
     const studentPassword = await bcrypt.hash('student123', 10);
     const studentData = {
       email: 'student@campus.com',
@@ -50,21 +46,36 @@ export async function GET() {
     };
 
     console.log('Creando/actualizando estudiante de prueba...');
-    await User.findOneAndUpdate(
-      { email: studentData.email },
-      { ...studentData },
-      { upsert: true, new: true }
-    );
+    let student;
+    try {
+      student = await User.findOneAndUpdate(
+        { email: studentData.email },
+        { ...studentData },
+        { upsert: true, new: true }
+      );
+      console.log('Estudiante creado/actualizado:', student.email);
+    } catch (error) {
+      console.error('Error al crear/actualizar estudiante:', error);
+      throw new Error('Error al crear/actualizar estudiante');
+    }
 
     return NextResponse.json({
       message: 'Usuarios inicializados correctamente',
-      adminEmail: adminData.email,
-      studentEmail: studentData.email
+      users: {
+        admin: {
+          email: admin.email,
+          role: admin.role
+        },
+        student: {
+          email: student.email,
+          role: student.role
+        }
+      }
     });
   } catch (error) {
-    console.error('Error al inicializar usuarios:', error);
+    console.error('Error en la inicialización de usuarios:', error);
     return NextResponse.json(
-      { error: 'Error al inicializar usuarios', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: error instanceof Error ? error.message : 'Error desconocido' },
       { status: 500 }
     );
   }
