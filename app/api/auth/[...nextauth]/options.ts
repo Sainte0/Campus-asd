@@ -4,7 +4,8 @@ import { User as AuthUser } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
-import User from '@/models/User';
+import User, { IUser } from '@/models/User';
+import { Types } from 'mongoose';
 
 declare module 'next-auth' {
   interface CustomUser extends AuthUser {
@@ -60,7 +61,9 @@ export const authOptions: AuthOptions = {
             throw new Error('Error de conexión con la base de datos');
           }
 
-          const user = await User.findOne({ email: credentials.email }).select('+password').lean();
+          const user = await User.findOne({ email: credentials.email })
+            .select('+password')
+            .exec() as IUser | null;
 
           if (!user) {
             throw new Error('Usuario no encontrado');
@@ -73,7 +76,7 @@ export const authOptions: AuthOptions = {
           }
 
           return {
-            id: user._id.toString(),
+            id: (user._id as Types.ObjectId).toString(),
             email: user.email,
             name: user.name,
             role: user.role

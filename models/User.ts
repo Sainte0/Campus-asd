@@ -1,15 +1,15 @@
-import mongoose from 'mongoose';
+import mongoose, { Document, Model } from 'mongoose';
 
-export interface IUser extends mongoose.Document {
+export interface IUser extends Document {
   email: string;
   password: string;
   name: string;
   role: 'student' | 'admin';
-  createdAt: Date;
-  updatedAt: Date;
   eventbriteId?: string;
   tempPassword?: string;
   passwordChanged: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const userSchema = new mongoose.Schema({
@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true,
+    select: false, // No incluir por defecto en las consultas
   },
   role: {
     type: String,
@@ -46,6 +47,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-const User = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
+const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
 
 export default User; 
