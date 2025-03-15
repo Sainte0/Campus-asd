@@ -38,9 +38,29 @@ export const authOptions: AuthOptions = {
             throw new Error('Por favor ingrese email y contraseña');
           }
 
-          await connectDB();
+          // Intentar conectar a MongoDB con reintentos
+          let retries = 3;
+          let lastError;
+          
+          while (retries > 0) {
+            try {
+              await connectDB();
+              break;
+            } catch (error) {
+              lastError = error;
+              retries--;
+              if (retries > 0) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+          }
 
-          const user = await User.findOne({ email: credentials.email }).select('+password');
+          if (retries === 0) {
+            console.error('Failed to connect to MongoDB after retries:', lastError);
+            throw new Error('Error de conexión con la base de datos');
+          }
+
+          const user = await User.findOne({ email: credentials.email }).select('+password').lean();
 
           if (!user) {
             throw new Error('Usuario no encontrado');

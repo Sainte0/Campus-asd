@@ -17,33 +17,34 @@ if (!global.mongoose) {
 }
 
 async function connectDB() {
-  if (cached.conn) {
-    return cached.conn;
-  }
+  try {
+    if (cached.conn) {
+      return cached.conn;
+    }
 
-  if (!cached.promise) {
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      family: 4
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 30000,
+      keepAlive: true,
+      keepAliveInitialDelay: 300000
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
-    });
-  }
+    if (!cached.promise) {
+      mongoose.set('strictQuery', true);
+      cached.promise = mongoose.connect(MONGODB_URI, opts);
+    }
 
-  try {
     cached.conn = await cached.promise;
+    console.log('MongoDB connected successfully');
+    return cached.conn;
   } catch (e) {
     cached.promise = null;
     console.error('Error connecting to MongoDB:', e);
     throw e;
   }
-
-  return cached.conn;
 }
 
 export default connectDB; 
