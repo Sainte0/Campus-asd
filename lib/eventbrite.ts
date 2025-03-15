@@ -47,10 +47,10 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
     
     // Primero obtener las preguntas del evento
     console.log('📝 Obteniendo preguntas del evento...');
-    const questionsUrl = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/questions/`;
+    const questionsUrl = `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID}/questions/`;
     const questionsResponse = await fetch(questionsUrl, {
       headers: {
-        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
@@ -64,13 +64,13 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
       })), null, 2));
     }
 
-    // Obtener asistentes
-    const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/`;
+    // Obtener asistentes con sus respuestas
+    const url = `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID}/attendees/?expand=profile,answers`;
     console.log('🌐 Obteniendo asistentes desde:', url);
     
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
