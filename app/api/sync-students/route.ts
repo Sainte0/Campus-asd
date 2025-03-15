@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/options';
+import { options } from '../auth/[...nextauth]/options';
 import { getEventbriteAttendees } from '@/lib/eventbrite';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(options);
     
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(

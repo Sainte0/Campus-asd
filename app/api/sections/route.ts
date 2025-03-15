@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import connectDB from '@/lib/db';
 import Section from '@/models/Section';
-import { authOptions } from '../auth/[...nextauth]/options';
+import { options } from '../auth/[...nextauth]/options';
 
 // GET /api/sections - Obtener todas las secciones
 export async function GET() {
@@ -22,7 +22,7 @@ export async function GET() {
 // POST /api/sections - Crear una nueva sección
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(options);
     
     // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import connectDB from '@/lib/db';
 import Section from '@/models/Section';
-import { authOptions } from '../../auth/[...nextauth]/options';
+import { options } from '../../auth/[...nextauth]/options';
 
 // PUT /api/sections/[id] - Actualizar una sección
 export async function PUT(
@@ -10,7 +10,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(options);
     
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
@@ -51,7 +51,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(options);
     
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(

@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/options';
+import { options } from '../auth/[...nextauth]/options';
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(options);
     
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
