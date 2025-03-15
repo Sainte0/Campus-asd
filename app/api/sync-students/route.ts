@@ -60,24 +60,28 @@ export async function POST(request: Request) {
     for (const attendee of attendees) {
       try {
         console.log(`\n🔄 Procesando asistente: ${attendee.profile.email}`);
-        console.log('📝 Datos del asistente:', {
+        console.log('📝 Datos completos del asistente:', JSON.stringify({
           id: attendee.id,
           name: attendee.profile.name,
           email: attendee.profile.email,
-          answers: attendee.profile.answers
-        });
+          answers: attendee.profile.answers?.map(a => ({
+            question_id: a.question_id,
+            answer: a.answer
+          }))
+        }, null, 2));
         
         // Obtener el documento del asistente
+        console.log('🔍 Buscando documento con Question ID:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
         const documentoAnswer = attendee.profile.answers?.find(
           answer => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
         );
 
         if (!documentoAnswer?.answer) {
           console.log(`⚠️ No se encontró documento para: ${attendee.profile.email}`);
-          console.log('Question ID buscado:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
-          console.log('Respuestas disponibles:', attendee.profile.answers);
+          console.log('❓ Question ID configurado:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
+          console.log('📋 Todas las respuestas disponibles:', JSON.stringify(attendee.profile.answers, null, 2));
           results.errors++;
-          results.details.push(`No se encontró documento para: ${attendee.profile.email}`);
+          results.details.push(`No se encontró documento para: ${attendee.profile.email} - IDs disponibles: ${attendee.profile.answers?.map(a => a.question_id).join(', ')}`);
           continue;
         }
 

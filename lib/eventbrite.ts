@@ -44,10 +44,29 @@ interface EventbriteResponse {
 export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
   try {
     console.log('🔄 Obteniendo asistentes de Eventbrite...');
-    console.log('📝 Usando EVENT_ID:', process.env.EVENTBRITE_EVENT_ID);
     
+    // Primero obtener las preguntas del evento
+    console.log('📝 Obteniendo preguntas del evento...');
+    const questionsUrl = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/questions/`;
+    const questionsResponse = await fetch(questionsUrl, {
+      headers: {
+        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (questionsResponse.ok) {
+      const questionsData = await questionsResponse.json();
+      console.log('📋 Preguntas disponibles:', JSON.stringify(questionsData.questions.map((q: any) => ({
+        id: q.id,
+        text: q.question.text,
+        type: q.question.type
+      })), null, 2));
+    }
+
+    // Obtener asistentes
     const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/`;
-    console.log('🌐 URL:', url);
+    console.log('🌐 Obteniendo asistentes desde:', url);
     
     const response = await fetch(url, {
       headers: {
@@ -65,14 +84,13 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
     const data = await response.json() as EventbriteResponse;
     console.log(`✅ ${data.attendees.length} asistentes encontrados`);
     
-    // Log de cada asistente
+    // Log de cada asistente y sus respuestas
     data.attendees.forEach(attendee => {
-      console.log('👤 Asistente:', {
-        id: attendee.id,
-        email: attendee.profile.email,
-        name: attendee.profile.name,
-        answers: attendee.profile.answers
-      });
+      console.log('\n👤 Asistente:', attendee.profile.email);
+      console.log('📝 Respuestas:', JSON.stringify(attendee.profile.answers?.map(a => ({
+        question_id: a.question_id,
+        answer: a.answer
+      })), null, 2));
     });
     
     return data.attendees;
