@@ -33,30 +33,35 @@ export const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Please enter an email and password');
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            throw new Error('Por favor ingrese email y contraseña');
+          }
+
+          await connectDB();
+
+          const user = await User.findOne({ email: credentials.email }).select('+password');
+
+          if (!user) {
+            throw new Error('Usuario no encontrado');
+          }
+
+          const isValid = await bcrypt.compare(credentials.password, user.password);
+
+          if (!isValid) {
+            throw new Error('Contraseña incorrecta');
+          }
+
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role
+          };
+        } catch (error) {
+          console.error('Error en autenticación:', error);
+          throw error;
         }
-
-        await connectDB();
-
-        const user = await User.findOne({ email: credentials.email });
-
-        if (!user) {
-          throw new Error('No user found');
-        }
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isValid) {
-          throw new Error('Invalid password');
-        }
-
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.name,
-          role: user.role
-        };
       }
     })
   ],
@@ -81,5 +86,6 @@ export const authOptions: AuthOptions = {
   pages: {
     signIn: '/',
     error: '/'
-  }
+  },
+  debug: process.env.NODE_ENV === 'development'
 }; 
