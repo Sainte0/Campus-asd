@@ -47,10 +47,10 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
     
     // Primero obtener las preguntas del evento
     console.log('📝 Obteniendo preguntas del evento...');
-    const questionsUrl = `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID}/questions/`;
+    const questionsUrl = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/questions/`;
     const questionsResponse = await fetch(questionsUrl, {
       headers: {
-        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`,
+        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
@@ -65,12 +65,14 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
     }
 
     // Obtener asistentes con sus respuestas
-    const url = `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID}/attendees/?expand=profile,answers`;
-    console.log('🌐 Obteniendo asistentes desde:', url);
+    const url = new URL(`https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/`);
+    url.searchParams.append('expand', 'profile,answers');
+    url.searchParams.append('status', 'attending');
+    console.log('🌐 Obteniendo asistentes desde:', url.toString());
     
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       headers: {
-        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`,
+        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
@@ -82,18 +84,36 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
     }
 
     const data = await response.json() as EventbriteResponse;
-    console.log(`✅ ${data.attendees.length} asistentes encontrados`);
     
-    // Log de cada asistente y sus respuestas
-    data.attendees.forEach(attendee => {
-      console.log('\n👤 Asistente:', attendee.profile.email);
-      console.log('📝 Respuestas:', JSON.stringify(attendee.profile.answers?.map(a => ({
-        question_id: a.question_id,
-        answer: a.answer
-      })), null, 2));
-    });
-    
-    return data.attendees;
+    // Obtener respuestas para cada asistente
+    const attendeesWithAnswers = await Promise.all(data.attendees.map(async (attendee) => {
+      const answersUrl = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendee.id}/answers/`;
+      const answersResponse = await fetch(answersUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (answersResponse.ok) {
+        const answersData = await answersResponse.json();
+        console.log(`📝 Respuestas para ${attendee.profile.email}:`, JSON.stringify(answersData.answers, null, 2));
+        return {
+          ...attendee,
+          profile: {
+            ...attendee.profile,
+            answers: answersData.answers.map((answer: any) => ({
+              question_id: answer.question_id,
+              answer: answer.answer
+            }))
+          }
+        };
+      }
+      return attendee;
+    }));
+
+    console.log(`✅ ${attendeesWithAnswers.length} asistentes procesados`);
+    return attendeesWithAnswers;
   } catch (error) {
     console.error('❌ Error al obtener asistentes de Eventbrite:', error);
     throw error;
