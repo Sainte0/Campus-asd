@@ -6,78 +6,117 @@ import connectDB from '@/lib/db';
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 
+interface SyncResults {
+  created: number;
+  updated: number;
+  errors: number;
+  details: string[];
+}
+
 export async function POST(request: Request) {
   try {
+    console.log('🔄 Iniciando sincronización de estudiantes...');
+    
     const session = await getServerSession(options);
     
     if (!session?.user || session.user.role !== 'admin') {
+      console.log('❌ Acceso no autorizado');
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 401 }
       );
     }
 
-    // Obtener asistentes de Eventbrite
-    const attendees = await getEventbriteAttendees();
-
-    // Conectar a la base de datos
+    console.log('🔄 Conectando a MongoDB...');
     await connectDB();
+    console.log('✅ Conexión a MongoDB establecida');
 
-    const results = {
+    console.log('🔍 Obteniendo asistentes de Eventbrite...');
+    const attendees = await getEventbriteAttendees();
+    console.log(`✅ ${attendees.length} asistentes encontrados`);
+
+    const results: SyncResults = {
       created: 0,
       updated: 0,
       errors: 0,
+      details: []
     };
 
-    // Procesar cada asistente
     for (const attendee of attendees) {
       try {
-        // Generar una contraseña temporal
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        console.log(`🔄 Procesando asistente: ${attendee.profile.email}`);
+        
+        // Obtener el documento del asistente
+        const documentoAnswer = attendee.profile.answers?.find(
+          answer => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
+        );
 
-        // Buscar o crear el usuario
-        const existingUser = await User.findOne({ email: attendee.profile.email });
+        if (!documentoAnswer?.answer) {
+          console.log(`⚠️ No se encontró documento para: ${attendee.profile.email}`);
+          results.errors++;
+          results.details.push(`No se encontró documento para: ${attendee.profile.email}`);
+          continue;
+        }
+
+        const documento = documentoAnswer.answer.trim();
+        
+        // Buscar usuario existente
+        const existingUser = await User.findOne({
+          $or: [
+            { email: attendee.profile.email },
+            { eventbriteId: attendee.id },
+            { documento: documento }
+          ]
+        });
 
         if (existingUser) {
           // Actualizar usuario existente
-          await User.updateOne(
-            { email: attendee.profile.email },
-            {
-              $set: {
-                name: `${attendee.profile.first_name} ${attendee.profile.last_name}`,
-                eventbriteId: attendee.id,
-                role: 'student',
-              },
-            }
-          );
+          await User.findByIdAndUpdate(existingUser._id, {
+            name: attendee.profile.name,
+            eventbriteId: attendee.id,
+            // No actualizamos la contraseña ya que debe ser el documento
+          });
+          console.log(`📝 Usuario actualizado: ${attendee.profile.email}`);
           results.updated++;
+          results.details.push(`Usuario actualizado: ${attendee.profile.email}`);
         } else {
           // Crear nuevo usuario
+          const hashedPassword = await bcrypt.hash(documento, 10);
           await User.create({
+            name: attendee.profile.name,
             email: attendee.profile.email,
-            name: `${attendee.profile.first_name} ${attendee.profile.last_name}`,
             password: hashedPassword,
-            eventbriteId: attendee.id,
             role: 'student',
-            tempPassword: tempPassword, // Guardar la contraseña temporal para enviarla por email
+            eventbriteId: attendee.id,
+            documento: documento,
+            status: 'registered'
           });
+          console.log(`✨ Usuario creado: ${attendee.profile.email}`);
           results.created++;
+          results.details.push(`Usuario creado: ${attendee.profile.email}`);
         }
       } catch (error) {
-        console.error('Error processing attendee:', attendee.id, error);
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+        console.error(`❌ Error procesando asistente ${attendee.profile.email}:`, errorMessage);
         results.errors++;
+        results.details.push(`Error con ${attendee.profile.email}: ${errorMessage}`);
       }
     }
 
+    console.log('✅ Sincronización completada:', results);
     return NextResponse.json({
       message: 'Sincronización completada',
-      results,
+      results
     });
+
   } catch (error) {
-    console.error('Error en la sincronización:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    console.error('❌ Error en sincronización:', errorMessage);
     return NextResponse.json(
-      { error: 'Error en la sincronización' },
+      { 
+        error: 'Error en sincronización',
+        details: errorMessage
+      },
       { status: 500 }
     );
   }

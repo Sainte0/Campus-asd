@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       'order.placed',
       'order.updated',
       'attendee.updated',
+      'attendee.created',
       'attendee.checked_in',
       'attendee.checked_out'
     ];
@@ -58,7 +59,8 @@ export async function POST(request: Request) {
       console.log('⚠️ Acción ignorada:', payload.action);
       return NextResponse.json({ 
         message: 'Acción ignorada',
-        action: payload.action
+        action: payload.action,
+        validActions
       });
     }
 
@@ -161,8 +163,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Solo crear nuevo usuario para order.placed y attendee.updated
-    if (!['order.placed', 'attendee.updated'].includes(payload.action)) {
+    // Solo crear nuevo usuario para order.placed, attendee.created y attendee.updated
+    if (!['order.placed', 'attendee.created', 'attendee.updated'].includes(payload.action)) {
       console.log('ℹ️ No se requiere crear usuario para esta acción:', payload.action);
       return NextResponse.json({
         message: 'No se requiere crear usuario para esta acción',
@@ -215,6 +217,7 @@ export async function GET() {
     validActions: [
       'order.placed',
       'order.updated',
+      'attendee.created',
       'attendee.updated',
       'attendee.checked_in',
       'attendee.checked_out'

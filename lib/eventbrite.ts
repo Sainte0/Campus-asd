@@ -14,77 +14,55 @@ if (!EVENTBRITE_EVENT_ID) {
   throw new Error('Please define EVENTBRITE_EVENT_ID in your .env file');
 }
 
-export interface EventbriteAttendee {
+interface EventbriteAnswer {
+  question_id: string;
+  answer: string;
+}
+
+interface EventbriteProfile {
+  name: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  answers?: EventbriteAnswer[];
+}
+
+interface EventbriteAttendee {
   id: string;
-  profile: {
-    name: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-  };
+  profile: EventbriteProfile;
   status: string;
 }
 
+interface EventbriteResponse {
+  attendees: EventbriteAttendee[];
+  pagination: {
+    has_more_items: boolean;
+    continuation: string;
+  };
+}
+
 export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
-  const allAttendees: EventbriteAttendee[] = [];
-  let continuation: string | null = null;
-  let page = 1;
-
   try {
-    do {
-      const url = new URL(`https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID}/attendees/`);
-      url.searchParams.append('status', 'attending,checked_in,completed,not_attending,unpaid');
-      if (continuation) {
-        url.searchParams.append('continuation', continuation);
-      }
-
-      console.log(`Fetching page ${page}...`);
-      const response = await fetch(url.toString(), {
+    console.log('🔄 Obteniendo asistentes de Eventbrite...');
+    const response = await fetch(
+      `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/`,
+      {
         headers: {
-          'Authorization': `Bearer ${EVENTBRITE_API_KEY}`,
+          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
           'Content-Type': 'application/json',
         },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Eventbrite API error:', errorData);
-        throw new Error(`Failed to fetch attendees from Eventbrite: ${errorData.error_description || 'Unknown error'}`);
       }
-
-      const data = await response.json();
-      
-      // Log de depuración para ver los estados de los asistentes
-      const attendeesByStatus = data.attendees.reduce((acc: any, attendee: any) => {
-        acc[attendee.status] = (acc[attendee.status] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('Attendees by status on this page:', attendeesByStatus);
-      
-      allAttendees.push(...data.attendees);
-      
-      // Actualizar el token de continuación para la siguiente página
-      continuation = data.pagination?.continuation || null;
-      page++;
-      
-      console.log(`Total attendees so far: ${allAttendees.length}`);
-      
-    } while (continuation);
-
-    console.log('Final summary:');
-    console.log('Total attendees fetched:', allAttendees.length);
-    const finalStatusCount = allAttendees.reduce((acc: any, attendee: any) => {
-      acc[attendee.status] = (acc[attendee.status] || 0) + 1;
-      return acc;
-    }, {});
-    console.log('Final status breakdown:', finalStatusCount);
-
-    // Retornar solo los asistentes con estados válidos
-    return allAttendees.filter(attendee => 
-      ['Attending', 'Checked In', 'Completed'].includes(attendee.status)
     );
+
+    if (!response.ok) {
+      throw new Error(`Error al obtener asistentes: ${response.status}`);
+    }
+
+    const data = await response.json() as EventbriteResponse;
+    console.log(`✅ ${data.attendees.length} asistentes encontrados`);
+    return data.attendees;
   } catch (error) {
-    console.error('Error fetching Eventbrite attendees:', error);
+    console.error('❌ Error al obtener asistentes de Eventbrite:', error);
     throw error;
   }
 }
