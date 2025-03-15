@@ -8,7 +8,7 @@ import connectDB from '@/lib/db';
 import User from '@/models/User';
 
 declare module 'next-auth' {
-  interface User extends AuthUser {
+  interface CustomUser extends AuthUser {
     role: string;
   }
   
@@ -21,11 +21,11 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    role?: string;
+    role: string;
   }
 }
 
-export const authOptions: AuthOptions = {
+const config = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -83,8 +83,8 @@ export const authOptions: AuthOptions = {
     signIn: '/',
     error: '/'
   }
-};
+} satisfies AuthOptions;
 
-const handler = NextAuth(authOptions);
+const handler = NextAuth(config);
 
 export { handler as GET, handler as POST }; 
