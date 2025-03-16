@@ -62,6 +62,15 @@ export default function SectionsManagement() {
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.type)) {
       setError('Solo se permiten archivos PDF y DOC/DOCX');
+      e.target.value = ''; // Limpiar el input
+      return;
+    }
+
+    // Verificar el tamaño del archivo (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB en bytes
+    if (file.size > maxSize) {
+      setError('El archivo es demasiado grande. El tamaño máximo es 10MB');
+      e.target.value = ''; // Limpiar el input
       return;
     }
 
@@ -73,6 +82,8 @@ export default function SectionsManagement() {
     if (!selectedFile) return null;
 
     setUploadingFile(true);
+    setError('');
+    
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -82,15 +93,16 @@ export default function SectionsManagement() {
         body: formData,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al subir el archivo');
+        throw new Error(data.error || data.details || 'Error al subir el archivo');
       }
 
-      const data = await response.json();
       return data.fileUrl;
     } catch (error) {
       console.error('Error al subir el archivo:', error);
+      setError(error instanceof Error ? error.message : 'Error al subir el archivo');
       throw error;
     } finally {
       setUploadingFile(false);
@@ -353,7 +365,9 @@ export default function SectionsManagement() {
                       file:rounded-md file:border-0
                       file:text-sm file:font-semibold
                       file:bg-blue-50 file:text-blue-700
-                      hover:file:bg-blue-100"
+                      hover:file:bg-blue-100
+                      disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={uploadingFile}
                   />
                   {selectedFile && (
                     <span className="ml-2 text-sm text-gray-500">
@@ -361,6 +375,16 @@ export default function SectionsManagement() {
                     </span>
                   )}
                 </div>
+                {error && (
+                  <p className="mt-2 text-sm text-red-600">
+                    {error}
+                  </p>
+                )}
+                {uploadingFile && (
+                  <p className="mt-2 text-sm text-blue-600">
+                    Subiendo archivo...
+                  </p>
+                )}
                 {pdfUrl && !selectedFile && (
                   <div className="mt-2">
                     <a

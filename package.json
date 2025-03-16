@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "campus-virtual": "file:",
     "dotenv": "^16.4.7",
     "mongodb": "^6.3.0",
     "mongoose": "^8.1.0",
