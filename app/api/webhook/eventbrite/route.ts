@@ -26,22 +26,25 @@ interface EventbriteWebhookPayload {
     action: string;
     endpoint_url: string;
     user_id: string;
+    webhook_id: string;
   };
-  action: string;
+  action?: string;
   attendee?: EventbriteAttendee;
   order_id?: string;
 }
 
+// Solo mantenemos las acciones que realmente necesitamos
 const validActions = [
-  'order.placed',
-  'attendee.updated',
-  'attendee.checked_in',
-  'attendee.checked_out'
+  'order.placed',  // Cuando alguien paga
+  'order.updated', // Si hay cambios en la orden
+  'attendee.updated' // Si hay cambios en los datos del asistente
 ];
 
-async function getAttendeeData(attendeeId: string) {
-  const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendeeId}/?expand=profile,answers`;
-  console.log('🔍 Obteniendo datos del asistente:', url);
+async function getOrderAttendees(orderId: string) {
+  console.log('🔍 Obteniendo asistentes de la orden:', orderId);
+  
+  const url = `https://www.eventbriteapi.com/v3/orders/${orderId}/attendees/?expand=profile,answers`;
+  console.log('🌐 URL:', url);
 
   const response = await fetch(url, {
     headers: {
@@ -50,23 +53,85 @@ async function getAttendeeData(attendeeId: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Error obteniendo datos del asistente: ${response.status}`);
+    const errorText = await response.text();
+    console.error('❌ Error obteniendo asistentes:', response.status);
+    console.error('📝 Error detallado:', errorText);
+    throw new Error(`Error obteniendo asistentes: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('✅ Asistentes encontrados:', data.attendees?.length || 0);
+  return data.attendees || [];
+}
+
+async function processAttendee(attendee: any) {
+  console.log('\n👤 Procesando asistente:', attendee.profile?.email);
+  
+  const email = attendee.profile?.email;
+  const name = `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim();
+  
+  if (!email || !name) {
+    throw new Error('Datos de perfil incompletos');
+  }
+
+  // Find documento in answers
+  console.log('🔍 Buscando documento en respuestas');
+  let documento = null;
+  
+  if (attendee.answers && Array.isArray(attendee.answers)) {
+    console.log('📝 Respuestas disponibles:', JSON.stringify(attendee.answers, null, 2));
+    const documentoAnswer = attendee.answers.find(
+      (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
+    );
+    if (documentoAnswer) {
+      documento = documentoAnswer.answer;
+      console.log('✅ Documento encontrado:', documento);
+    }
+  }
+
+  if (!documento) {
+    throw new Error(`No se encontró documento para: ${email}`);
+  }
+
+  // Create or update user
+  const existingUser = await User.findOne({ email });
+  
+  if (existingUser) {
+    console.log('📝 Actualizando usuario existente:', email);
+    existingUser.name = name;
+    existingUser.documento = documento;
+    await existingUser.save();
+    console.log('✅ Usuario actualizado:', email);
+    return { action: 'updated', email };
+  } else {
+    console.log('👤 Creando nuevo usuario:', email);
+    const hashedPassword = await bcrypt.hash(documento, 10);
+    const newUser = new User({
+      name,
+      email,
+      password: hashedPassword,
+      documento,
+      role: 'student'
+    });
+    await newUser.save();
+    console.log('✅ Usuario creado:', email);
+    return { action: 'created', email };
+  }
 }
 
 export async function POST(request: Request) {
   try {
-    console.log('📥 Webhook recibido de Eventbrite');
+    console.log('\n📥 Webhook recibido de Eventbrite');
     const data = await request.json() as EventbriteWebhookPayload;
     
-    console.log('📋 Acción recibida:', data.action);
+    // Get action from config
+    const action = data.config.action; // La acción está en config.action
+    console.log('📋 Acción recibida:', action);
     console.log('📝 Datos completos:', JSON.stringify(data, null, 2));
 
-    if (!validActions.includes(data.action)) {
-      console.log('⏭️ Acción ignorada:', data.action);
-      return NextResponse.json({ status: 'ignored', action: data.action });
+    if (!validActions.includes(action)) {
+      console.log('⏭️ Acción ignorada:', action);
+      return NextResponse.json({ status: 'ignored', action });
     }
 
     // Connect to MongoDB
@@ -74,162 +139,75 @@ export async function POST(request: Request) {
     await connectDB();
     console.log('✅ Conexión establecida');
 
-    let attendeeData;
-    
-    // Get attendee data based on the webhook type
-    if (data.action === 'order.placed') {
-      // For orders, we need to get the attendee data from the order
-      console.log('🎫 Procesando nueva orden');
-      console.log('📝 URL de la API:', data.api_url);
-      
-      // Get order ID from the URL
-      const orderId = data.api_url.split('/').pop();
-      console.log('🔑 Order ID:', orderId);
-      
-      // Get attendees for this order
-      const orderUrl = `https://www.eventbriteapi.com/v3/orders/${orderId}/attendees/?expand=profile,answers`;
-      console.log('🔍 Obteniendo asistentes de la orden:', orderUrl);
-      
-      const response = await fetch(orderUrl, {
+    const results = {
+      status: 'success',
+      action,
+      processed: [] as any[]
+    };
+
+    if (action === 'order.placed' || action === 'order.updated') {
+      // Extract order ID from URL
+      const orderId = data.api_url.split('/').pop()?.replace('/', '');
+      if (!orderId) {
+        throw new Error('No se pudo obtener el ID de la orden');
+      }
+
+      console.log('🎫 Procesando orden:', orderId);
+
+      // Get and process all attendees in the order
+      const attendees = await getOrderAttendees(orderId);
+      console.log(`📋 Procesando ${attendees.length} asistentes`);
+
+      for (const attendee of attendees) {
+        try {
+          const result = await processAttendee(attendee);
+          results.processed.push(result);
+        } catch (error) {
+          console.error('❌ Error procesando asistente:', error);
+          results.processed.push({ 
+            action: 'error', 
+            email: attendee.profile?.email,
+            error: error instanceof Error ? error.message : 'Error desconocido'
+          });
+        }
+      }
+    } else if (action === 'attendee.updated') {
+      // For attendee updates, we need to get the attendee data
+      const attendeeId = data.api_url.split('/').pop()?.replace('/', '');
+      if (!attendeeId) {
+        throw new Error('No se pudo obtener el ID del asistente');
+      }
+
+      console.log('👤 Procesando actualización de asistente:', attendeeId);
+
+      // Get attendee data
+      const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendeeId}/?expand=profile,answers`;
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`
         }
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error obteniendo asistentes de la orden:', response.status);
-        console.error('📝 Error detallado:', errorText);
-        throw new Error(`Error obteniendo asistentes de la orden: ${response.status}`);
+        throw new Error(`Error obteniendo datos del asistente: ${response.status}`);
       }
 
-      const orderData = await response.json();
-      console.log('📦 Datos de la orden:', JSON.stringify(orderData, null, 2));
-
-      if (!orderData.attendees || !orderData.attendees.length) {
-        throw new Error('No se encontraron asistentes en la orden');
-      }
-
-      // Process each attendee in the order
-      for (const attendee of orderData.attendees) {
-        console.log('👤 Procesando asistente de la orden:', attendee.profile?.email);
-        
-        const email = attendee.profile?.email;
-        const name = `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim();
-        
-        // Find documento in answers
-        console.log('🔍 Buscando documento en respuestas');
-        console.log('📝 Respuestas disponibles:', attendee.answers);
-        
-        let documento = null;
-        if (attendee.answers && Array.isArray(attendee.answers)) {
-          const documentoAnswer = attendee.answers.find(
-            (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
-          );
-          if (documentoAnswer) {
-            documento = documentoAnswer.answer;
-            console.log('✅ Documento encontrado:', documento);
-          }
-        }
-
-        if (!documento) {
-          console.error('❌ No se encontró documento para:', email);
-          continue;
-        }
-
-        // Create or update user
-        const existingUser = await User.findOne({ email });
-        
-        if (existingUser) {
-          console.log('📝 Actualizando usuario existente:', email);
-          existingUser.name = name;
-          existingUser.documento = documento;
-          await existingUser.save();
-          console.log('✅ Usuario actualizado:', email);
-        } else {
-          console.log('👤 Creando nuevo usuario:', email);
-          const hashedPassword = await bcrypt.hash(documento, 10);
-          const newUser = new User({
-            name,
-            email,
-            password: hashedPassword,
-            documento,
-            role: 'student'
-          });
-          await newUser.save();
-          console.log('✅ Usuario creado:', email);
-        }
-      }
-
-      return NextResponse.json({ 
-        status: 'success',
-        action: 'processed_order',
-        orderId
-      });
-
-    } else {
-      // For attendee events, the data is included in the webhook
-      attendeeData = data.attendee;
-      
-      if (!attendeeData || !attendeeData.profile) {
-        throw new Error('Datos del asistente no válidos');
-      }
-
-      const email = attendeeData.profile.email;
-      const name = `${attendeeData.profile.first_name} ${attendeeData.profile.last_name}`.trim();
-      
-      // Find documento in answers
-      console.log('🔍 Buscando documento en respuestas');
-      let documento = null;
-      if (attendeeData.profile.answers && Array.isArray(attendeeData.profile.answers)) {
-        const documentoAnswer = attendeeData.profile.answers.find(
-          (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
-        );
-        if (documentoAnswer) {
-          documento = documentoAnswer.answer;
-          console.log('✅ Documento encontrado:', documento);
-        }
-      }
-
-      if (!documento) {
-        throw new Error(`No se encontró documento para el asistente: ${email}`);
-      }
-
-      // Create or update user
-      const existingUser = await User.findOne({ email });
-      
-      if (existingUser) {
-        console.log('📝 Actualizando usuario existente:', email);
-        existingUser.name = name;
-        existingUser.documento = documento;
-        await existingUser.save();
-        console.log('✅ Usuario actualizado');
-        
-        return NextResponse.json({ 
-          status: 'success',
-          action: 'updated',
-          email 
-        });
-      } else {
-        console.log('👤 Creando nuevo usuario:', email);
-        const hashedPassword = await bcrypt.hash(documento, 10);
-        const newUser = new User({
-          name,
-          email,
-          password: hashedPassword,
-          documento,
-          role: 'student'
-        });
-        await newUser.save();
-        console.log('✅ Usuario creado');
-
-        return NextResponse.json({ 
-          status: 'success',
-          action: 'created',
-          email 
+      const attendeeData = await response.json();
+      try {
+        const result = await processAttendee(attendeeData);
+        results.processed.push(result);
+      } catch (error) {
+        console.error('❌ Error procesando asistente:', error);
+        results.processed.push({ 
+          action: 'error',
+          email: attendeeData.profile?.email,
+          error: error instanceof Error ? error.message : 'Error desconocido'
         });
       }
     }
+
+    console.log('✅ Procesamiento completado:', results);
+    return NextResponse.json(results);
 
   } catch (error) {
     console.error('❌ Error procesando webhook:', error);
