@@ -43,25 +43,43 @@ const validActions = [
 async function getOrderAttendees(orderId: string) {
   console.log('🔍 Obteniendo asistentes de la orden:', orderId);
   
-  const url = `https://www.eventbriteapi.com/v3/orders/${orderId}/attendees/?expand=profile,answers`;
-  console.log('🌐 URL:', url);
+  // Ensure clean order ID
+  const cleanOrderId = orderId.replace('/', '');
+  const url = `https://www.eventbriteapi.com/v3/orders/${cleanOrderId}/attendees/?expand=profile,answers`;
+  console.log('🌐 URL de la petición:', url);
 
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Error obteniendo asistentes. Status:', response.status);
+      console.error('📝 Error detallado:', errorText);
+      throw new Error(`Error obteniendo asistentes: ${response.status} - ${errorText}`);
     }
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ Error obteniendo asistentes:', response.status);
-    console.error('📝 Error detallado:', errorText);
-    throw new Error(`Error obteniendo asistentes: ${response.status}`);
+    const data = await response.json();
+    console.log('✅ Respuesta recibida:', {
+      total: data.attendees?.length || 0,
+      pagination: data.pagination
+    });
+
+    if (!data.attendees || !Array.isArray(data.attendees)) {
+      console.error('❌ Formato de respuesta inválido:', data);
+      throw new Error('Formato de respuesta inválido');
+    }
+
+    console.log('👥 Asistentes encontrados:', data.attendees.length);
+    return data.attendees;
+  } catch (error) {
+    console.error('❌ Error en getOrderAttendees:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  console.log('✅ Asistentes encontrados:', data.attendees?.length || 0);
-  return data.attendees || [];
 }
 
 async function processAttendee(attendee: any) {
@@ -146,8 +164,11 @@ export async function POST(request: Request) {
     };
 
     if (action === 'order.placed' || action === 'order.updated') {
-      // Extract order ID from URL
-      const orderId = data.api_url.split('/').pop()?.replace('/', '');
+      // Extract order ID from URL - Format: https://www.eventbriteapi.com/v3/orders/12005268593/
+      const orderId = data.api_url.split('/orders/')[1]?.replace('/', '');
+      console.log('🔍 URL de la orden:', data.api_url);
+      console.log('🔑 Order ID extraído:', orderId);
+      
       if (!orderId) {
         throw new Error('No se pudo obtener el ID de la orden');
       }
