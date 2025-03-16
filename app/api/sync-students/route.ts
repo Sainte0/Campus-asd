@@ -111,12 +111,14 @@ export async function POST(req: Request) {
             console.log('✅ Usuario creado:', attendee.email);
             results.created++;
           }
-        } catch (userError) {
+        } catch (error) {
+          const userError = error as Error;
           console.error('❌ Error procesando usuario:', userError);
           results.errors++;
           results.details.push(`Error procesando usuario ${attendee.email}: ${userError.message}`);
         }
-      } catch (attendeeError) {
+      } catch (error) {
+        const attendeeError = error as Error;
         console.error('❌ Error procesando asistente:', attendeeError);
         results.errors++;
         results.details.push(`Error general procesando asistente ${attendee.email}: ${attendeeError.message}`);
