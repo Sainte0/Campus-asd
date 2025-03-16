@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { options } from '../auth/[...nextauth]/options';
-import { v2 as cloudinary } from 'cloudinary';
-
-// Configurar Cloudinary
-cloudinary.config({
-  cloud_name: 'sainte',  // Aseguramos que esté en minúsculas y sin espacios
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+import { connectToDatabase } from '@/lib/mongodb';
 
 // Nueva configuración de la ruta usando la sintaxis de Next.js 14
 export const runtime = 'nodejs';
@@ -64,38 +57,36 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const base64File = buffer.toString('base64');
-    const uploadStr = `data:${file.type};base64,${base64File}`;
 
     try {
-      console.log('📤 Subiendo archivo a Cloudinary...');
+      console.log('📤 Guardando archivo en MongoDB...');
       
-      const uploadResponse = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload(uploadStr, {
-          resource_type: 'auto',
-          folder: 'campus-virtual',
-          format: file.name.split('.').pop()?.toLowerCase(),
-          public_id: `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`.replace(/\.[^/.]+$/, '')
-        }, (error, result) => {
-          if (error) {
-            console.error('❌ Error de Cloudinary:', error);
-            reject(error);
-          } else {
-            console.log('✅ Respuesta de Cloudinary:', result);
-            resolve(result);
-          }
-        });
-      });
+      const { db } = await connectToDatabase();
+      
+      // Crear un documento para el archivo
+      const fileDoc = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        content: base64File,
+        uploadedAt: new Date(),
+        uploadedBy: session.user.email
+      };
 
-      console.log('✅ Archivo subido exitosamente a Cloudinary');
+      // Guardar en la colección 'files'
+      const result = await db.collection('files').insertOne(fileDoc);
+
+      console.log('✅ Archivo guardado exitosamente en MongoDB');
       return NextResponse.json({ 
-        fileUrl: (uploadResponse as any).secure_url 
+        fileId: result.insertedId.toString(),
+        fileName: file.name
       });
 
     } catch (error) {
-      console.error('❌ Error al subir archivo a Cloudinary:', error);
+      console.error('❌ Error al guardar archivo en MongoDB:', error);
       return NextResponse.json(
         { 
-          error: 'Error al subir el archivo a Cloudinary',
+          error: 'Error al guardar el archivo en MongoDB',
           details: error instanceof Error ? error.message : 'Error desconocido'
         },
         { status: 500 }
