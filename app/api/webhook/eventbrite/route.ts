@@ -32,195 +32,135 @@ interface EventbriteWebhookPayload {
   order_id?: string;
 }
 
+const validActions = [
+  'order.placed',
+  'attendee.updated',
+  'attendee.checked_in',
+  'attendee.checked_out'
+];
+
+async function getAttendeeData(attendeeId: string) {
+  const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendeeId}/?expand=profile,answers`;
+  console.log('🔍 Obteniendo datos del asistente:', url);
+
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Error obteniendo datos del asistente: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function POST(request: Request) {
-  const startTime = new Date();
-  console.log('🔵 Webhook iniciado:', startTime.toISOString());
-
   try {
-    const payload = await request.json() as EventbriteWebhookPayload;
-    console.log('📥 Webhook recibido:', {
-      action: payload.action,
-      attendee: payload.attendee?.profile?.email,
-      orderId: payload.order_id,
-      timestamp: new Date().toISOString()
-    });
+    console.log('📥 Webhook recibido de Eventbrite');
+    const data = await request.json();
+    
+    console.log('📋 Acción recibida:', data.action);
+    console.log('📝 Datos completos:', JSON.stringify(data, null, 2));
 
-    // Verificar que es un evento válido
-    const validActions = [
-      'order.placed',
-      'order.updated',
-      'attendee.updated',
-      'attendee.created',
-      'attendee.checked_in',
-      'attendee.checked_out'
-    ];
-
-    if (!validActions.includes(payload.action)) {
-      console.log('⚠️ Acción ignorada:', payload.action);
-      return NextResponse.json({ 
-        message: 'Acción ignorada',
-        action: payload.action,
-        validActions
-      });
+    if (!validActions.includes(data.action)) {
+      console.log('⏭️ Acción ignorada:', data.action);
+      return NextResponse.json({ status: 'ignored', action: data.action });
     }
 
+    // Connect to MongoDB
     console.log('🔄 Conectando a MongoDB...');
     await connectDB();
-    console.log('✅ Conexión a MongoDB establecida');
+    console.log('✅ Conexión establecida');
 
-    // Si es un evento de orden, necesitamos obtener los datos del asistente
-    let attendeeData = payload.attendee;
-    if (!attendeeData && payload.order_id) {
-      console.log('🔍 Buscando datos del asistente para la orden:', payload.order_id);
-      try {
-        const response = await fetch(
-          `https://www.eventbriteapi.com/v3/orders/${payload.order_id}/attendees/`,
-          {
-            headers: {
-              'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+    let attendeeData;
+    
+    // Get attendee data based on the webhook type
+    if (data.action === 'order.placed') {
+      // For orders, we need to get the attendee data separately
+      console.log('🎫 Procesando nueva orden');
+      const attendeeId = data.api_url.split('/').pop();
+      attendeeData = await getAttendeeData(attendeeId);
+    } else {
+      // For attendee events, the data is included in the webhook
+      attendeeData = data;
+    }
 
-        if (!response.ok) {
-          throw new Error(`Error al obtener datos de Eventbrite: ${response.status}`);
-        }
+    if (!attendeeData) {
+      throw new Error('No se pudo obtener datos del asistente');
+    }
 
-        const data = await response.json();
-        attendeeData = data.attendees[0];
-        console.log('✅ Datos del asistente obtenidos:', {
-          email: attendeeData?.profile?.email,
-          name: attendeeData?.profile?.name
-        });
-      } catch (error) {
-        console.error('❌ Error al obtener datos del asistente:', error);
-        return NextResponse.json(
-          { error: 'Error al obtener datos del asistente' },
-          { status: 500 }
-        );
+    // Extract attendee information
+    const email = attendeeData.profile?.email;
+    const name = `${attendeeData.profile?.first_name} ${attendeeData.profile?.last_name}`.trim();
+    
+    // Find documento in answers
+    console.log('🔍 Buscando documento en respuestas');
+    let documento = null;
+    if (attendeeData.answers && Array.isArray(attendeeData.answers)) {
+      const documentoAnswer = attendeeData.answers.find(
+        (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
+      );
+      if (documentoAnswer) {
+        documento = documentoAnswer.answer;
+        console.log('✅ Documento encontrado:', documento);
       }
     }
 
-    if (!attendeeData || !attendeeData.profile) {
-      console.error('❌ Datos del asistente no válidos:', attendeeData);
-      return NextResponse.json(
-        { error: 'Datos del asistente no válidos' },
-        { status: 400 }
-      );
+    if (!documento) {
+      throw new Error(`No se encontró documento para el asistente: ${email}`);
     }
 
-    // Mostrar todas las preguntas y sus IDs
-    console.log('📝 Preguntas del formulario:', 
-      attendeeData.profile.answers?.map(answer => ({
-        question_id: answer.question_id,
-        answer: answer.answer
-      }))
-    );
-
-    // Obtener el documento del asistente de las respuestas del formulario
-    const documentoAnswer = attendeeData.profile.answers?.find(
-      answer => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
-    );
-
-    if (!documentoAnswer?.answer) {
-      console.error('❌ No se encontró el documento del asistente');
-      return NextResponse.json(
-        { error: 'No se encontró el documento del asistente' },
-        { status: 400 }
-      );
-    }
-
-    const documento = documentoAnswer.answer.trim();
-    const hashedPassword = await bcrypt.hash(documento, 10);
-
-    // Verificar si el usuario ya existe
-    console.log('🔍 Verificando si el usuario existe:', attendeeData.profile.email);
-    const existingUser = await User.findOne({
-      $or: [
-        { email: attendeeData.profile.email },
-        { eventbriteId: attendeeData.id },
-        { documento: documento }
-      ]
-    });
-
+    // Create or update user
+    const existingUser = await User.findOne({ email });
+    
     if (existingUser) {
-      console.log('📝 Actualizando usuario existente:', attendeeData.profile.email);
-      // Actualizar usuario existente
-      await User.findByIdAndUpdate(existingUser._id, {
-        name: attendeeData.profile.name,
-        eventbriteId: attendeeData.id,
-        // No actualizamos la contraseña ya que siempre debe ser el documento
-        ...(payload.action === 'attendee.checked_in' && { status: 'checked_in' }),
-        ...(payload.action === 'attendee.checked_out' && { status: 'checked_out' })
-      });
-
-      console.log('✅ Usuario actualizado correctamente');
-      return NextResponse.json({
-        message: 'Usuario actualizado correctamente',
+      console.log('📝 Actualizando usuario existente:', email);
+      existingUser.name = name;
+      existingUser.documento = documento;
+      await existingUser.save();
+      console.log('✅ Usuario actualizado');
+      
+      return NextResponse.json({ 
+        status: 'success',
         action: 'updated',
-        email: attendeeData.profile.email
+        email 
+      });
+    } else {
+      console.log('👤 Creando nuevo usuario:', email);
+      const hashedPassword = await bcrypt.hash(documento, 10);
+      const newUser = new User({
+        name,
+        email,
+        password: hashedPassword,
+        documento,
+        role: 'student'
+      });
+      await newUser.save();
+      console.log('✅ Usuario creado');
+
+      return NextResponse.json({ 
+        status: 'success',
+        action: 'created',
+        email 
       });
     }
-
-    // Solo crear nuevo usuario para order.placed, attendee.created y attendee.updated
-    if (!['order.placed', 'attendee.created', 'attendee.updated'].includes(payload.action)) {
-      console.log('ℹ️ No se requiere crear usuario para esta acción:', payload.action);
-      return NextResponse.json({
-        message: 'No se requiere crear usuario para esta acción',
-        action: payload.action
-      });
-    }
-
-    // Crear nuevo usuario
-    console.log('👤 Creando nuevo usuario:', attendeeData.profile.email);
-    const newUser = await User.create({
-      name: attendeeData.profile.name,
-      email: attendeeData.profile.email,
-      password: hashedPassword,
-      role: 'student',
-      eventbriteId: attendeeData.id,
-      documento: documento,
-      status: payload.action === 'attendee.checked_in' ? 'checked_in' : 'registered'
-    });
-
-    console.log('✅ Usuario creado exitosamente:', {
-      email: attendeeData.profile.email,
-      documento: documento,
-      timestamp: new Date().toISOString()
-    });
-
-    const endTime = new Date();
-    const duration = endTime.getTime() - startTime.getTime();
-    console.log(`🏁 Webhook completado en ${duration}ms`);
-
-    return NextResponse.json({
-      message: 'Usuario creado correctamente',
-      action: 'created',
-      email: attendeeData.profile.email
-    });
 
   } catch (error) {
-    console.error('❌ Error en webhook de Eventbrite:', error);
-    return NextResponse.json(
-      { error: 'Error procesando webhook' },
-      { status: 500 }
-    );
+    console.error('❌ Error procesando webhook:', error);
+    return NextResponse.json({ 
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 });
   }
 }
 
-// Verificación de webhook
+// Endpoint para verificar que el webhook está activo
 export async function GET() {
   return NextResponse.json({ 
-    status: 'Webhook endpoint activo',
-    eventId: process.env.EVENTBRITE_EVENT_ID,
-    validActions: [
-      'order.placed',
-      'order.updated',
-      'attendee.created',
-      'attendee.updated',
-      'attendee.checked_in',
-      'attendee.checked_out'
-    ]
+    status: 'active',
+    validActions,
+    documentoQuestionId: process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
   });
 } 
