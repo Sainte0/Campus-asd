@@ -78,8 +78,8 @@ export default function SectionsManagement() {
     setError('');
   };
 
-  const uploadFile = async () => {
-    if (!selectedFile) return null;
+  const uploadFile = async (): Promise<string | undefined> => {
+    if (!selectedFile) return undefined;
 
     setUploadingFile(true);
     setError('');
@@ -107,8 +107,9 @@ export default function SectionsManagement() {
         throw new Error(data.details || data.error || 'Error al subir el archivo');
       }
 
-      console.log('✅ Archivo subido exitosamente:', data.fileUrl);
-      return data.fileUrl;
+      console.log('✅ Archivo subido exitosamente:', data);
+      // Construir la URL para descargar el archivo
+      return `/api/download/${data.fileId}`;
     } catch (error) {
       console.error('❌ Error al subir el archivo:', error);
       setError(error instanceof Error ? error.message : 'Error al subir el archivo');
@@ -125,7 +126,10 @@ export default function SectionsManagement() {
     try {
       let fileUrl = pdfUrl;
       if (selectedFile) {
-        fileUrl = await uploadFile();
+        const uploadedFileUrl = await uploadFile();
+        if (uploadedFileUrl) {
+          fileUrl = uploadedFileUrl;
+        }
       }
 
       const sectionData = {
@@ -184,7 +188,10 @@ export default function SectionsManagement() {
     try {
       let fileUrl = pdfUrl;
       if (selectedFile) {
-        fileUrl = await uploadFile();
+        const uploadedFileUrl = await uploadFile();
+        if (uploadedFileUrl) {
+          fileUrl = uploadedFileUrl;
+        }
       }
 
       const sectionData = {
