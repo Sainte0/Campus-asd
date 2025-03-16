@@ -88,6 +88,7 @@ export default function SectionsManagement() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
+      console.log('📤 Iniciando subida de archivo:', selectedFile.name);
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -96,12 +97,14 @@ export default function SectionsManagement() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Error al subir el archivo');
+        console.error('❌ Error en la respuesta:', data);
+        throw new Error(data.details || data.error || 'Error al subir el archivo');
       }
 
+      console.log('✅ Archivo subido exitosamente:', data.fileUrl);
       return data.fileUrl;
     } catch (error) {
-      console.error('Error al subir el archivo:', error);
+      console.error('❌ Error al subir el archivo:', error);
       setError(error instanceof Error ? error.message : 'Error al subir el archivo');
       throw error;
     } finally {

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir, access, constants } from 'fs/promises';
 import { join } from 'path';
 import { getServerSession } from 'next-auth';
 import { options } from '../auth/[...nextauth]/options';
-import { mkdir } from 'fs/promises';
 
 export async function POST(request: Request) {
   try {
@@ -52,35 +51,47 @@ export async function POST(request: Request) {
 
     // Asegurarse de que el directorio existe
     const uploadDir = join(process.cwd(), 'public', 'uploads');
+    console.log('📁 Directorio de uploads:', uploadDir);
+
     try {
-      await mkdir(uploadDir, { recursive: true });
-    } catch (error) {
-      if ((error as any).code !== 'EEXIST') {
-        console.error('❌ Error al crear directorio:', error);
-        throw error;
+      // Verificar si el directorio existe
+      try {
+        await access(uploadDir, constants.W_OK);
+        console.log('✅ Directorio de uploads existe y tiene permisos de escritura');
+      } catch (error) {
+        console.log('⚠️ Creando directorio de uploads...');
+        await mkdir(uploadDir, { recursive: true });
+        console.log('✅ Directorio de uploads creado');
       }
-    }
 
-    const filePath = join(uploadDir, fileName);
-    console.log('📁 Ruta del archivo:', filePath);
+      const filePath = join(uploadDir, fileName);
+      console.log('📁 Ruta completa del archivo:', filePath);
 
-    try {
       await writeFile(filePath, buffer);
       console.log('✅ Archivo guardado exitosamente');
+
+      // Devolver la URL del archivo
+      const fileUrl = `/uploads/${fileName}`;
+      console.log('🔗 URL del archivo:', fileUrl);
+
+      return NextResponse.json({ fileUrl });
     } catch (error) {
-      console.error('❌ Error al escribir el archivo:', error);
-      throw new Error('Error al guardar el archivo');
+      console.error('❌ Error al guardar el archivo:', error);
+      return NextResponse.json(
+        { 
+          error: 'Error al guardar el archivo',
+          details: error instanceof Error ? error.message : 'Error desconocido'
+        },
+        { status: 500 }
+      );
     }
-
-    // Devolver la URL del archivo
-    const fileUrl = `/uploads/${fileName}`;
-    console.log('🔗 URL del archivo:', fileUrl);
-
-    return NextResponse.json({ fileUrl });
   } catch (error) {
-    console.error('❌ Error al subir el archivo:', error);
+    console.error('❌ Error al procesar el archivo:', error);
     return NextResponse.json(
-      { error: 'Error al procesar el archivo', details: error instanceof Error ? error.message : 'Error desconocido' },
+      { 
+        error: 'Error al procesar el archivo',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
       { status: 500 }
     );
   }
