@@ -85,10 +85,10 @@ export default function SectionsManagement() {
     setError('');
     
     try {
+      console.log('📤 Preparando archivo para subida:', selectedFile.name);
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      console.log('📤 Iniciando subida de archivo:', selectedFile.name);
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,

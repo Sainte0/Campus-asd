@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir, access, constants } from 'fs/promises';
-import { join } from 'path';
 import { getServerSession } from 'next-auth';
 import { options } from '../auth/[...nextauth]/options';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configurar Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 export async function POST(request: Request) {
   try {
@@ -40,51 +46,48 @@ export async function POST(request: Request) {
       );
     }
 
+    // Convertir el archivo a un buffer y luego a base64
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-
-    // Crear un nombre de archivo único
-    const timestamp = Date.now();
-    const originalName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-    const fileName = `${timestamp}-${originalName}`;
-    console.log('📄 Nombre del archivo:', fileName);
-
-    // Asegurarse de que el directorio existe
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
-    console.log('📁 Directorio de uploads:', uploadDir);
+    const base64File = buffer.toString('base64');
+    const uploadStr = `data:${file.type};base64,${base64File}`;
 
     try {
-      // Verificar si el directorio existe
-      try {
-        await access(uploadDir, constants.W_OK);
-        console.log('✅ Directorio de uploads existe y tiene permisos de escritura');
-      } catch (error) {
-        console.log('⚠️ Creando directorio de uploads...');
-        await mkdir(uploadDir, { recursive: true });
-        console.log('✅ Directorio de uploads creado');
-      }
+      console.log('📤 Subiendo archivo a Cloudinary...');
+      
+      const uploadResponse = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload(uploadStr, {
+          resource_type: 'auto',
+          folder: 'campus-virtual',
+          format: file.name.split('.').pop()?.toLowerCase(),
+          public_id: `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`.replace(/\.[^/.]+$/, '')
+        }, (error, result) => {
+          if (error) {
+            console.error('❌ Error de Cloudinary:', error);
+            reject(error);
+          } else {
+            console.log('✅ Respuesta de Cloudinary:', result);
+            resolve(result);
+          }
+        });
+      });
 
-      const filePath = join(uploadDir, fileName);
-      console.log('📁 Ruta completa del archivo:', filePath);
+      console.log('✅ Archivo subido exitosamente a Cloudinary');
+      return NextResponse.json({ 
+        fileUrl: (uploadResponse as any).secure_url 
+      });
 
-      await writeFile(filePath, buffer);
-      console.log('✅ Archivo guardado exitosamente');
-
-      // Devolver la URL del archivo
-      const fileUrl = `/uploads/${fileName}`;
-      console.log('🔗 URL del archivo:', fileUrl);
-
-      return NextResponse.json({ fileUrl });
     } catch (error) {
-      console.error('❌ Error al guardar el archivo:', error);
+      console.error('❌ Error al subir archivo a Cloudinary:', error);
       return NextResponse.json(
         { 
-          error: 'Error al guardar el archivo',
+          error: 'Error al subir el archivo a Cloudinary',
           details: error instanceof Error ? error.message : 'Error desconocido'
         },
         { status: 500 }
       );
     }
+
   } catch (error) {
     console.error('❌ Error al procesar el archivo:', error);
     return NextResponse.json(
