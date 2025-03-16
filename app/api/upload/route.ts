@@ -10,6 +10,13 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Configurar el tamaño máximo de archivo
+export const config = {
+  api: {
+    bodyParser: false
+  }
+};
+
 export async function POST(request: Request) {
   try {
     console.log('📥 Iniciando proceso de subida de archivo...');
@@ -42,6 +49,16 @@ export async function POST(request: Request) {
       console.log('❌ Tipo de archivo no permitido:', file.type);
       return NextResponse.json(
         { error: 'Tipo de archivo no permitido. Solo se permiten archivos PDF y DOC/DOCX.' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar el tamaño del archivo (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      console.log('❌ Archivo demasiado grande:', file.size);
+      return NextResponse.json(
+        { error: 'El archivo es demasiado grande. El tamaño máximo es 10MB.' },
         { status: 400 }
       );
     }

@@ -94,7 +94,13 @@ export default function SectionsManagement() {
         body: formData,
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('❌ Error al parsear la respuesta:', e);
+        throw new Error('Error en el servidor al procesar el archivo');
+      }
 
       if (!response.ok) {
         console.error('❌ Error en la respuesta:', data);
