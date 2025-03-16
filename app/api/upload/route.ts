@@ -10,12 +10,9 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configurar el tamaño máximo de archivo
-export const config = {
-  api: {
-    bodyParser: false
-  }
-};
+// Nueva configuración de la ruta usando la sintaxis de Next.js 14
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
