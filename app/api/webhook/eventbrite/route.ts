@@ -194,7 +194,11 @@ export async function POST(request: Request) {
       }
     } else if (action === 'attendee.updated') {
       // For attendee updates, we need to get the attendee data
-      const attendeeId = data.api_url.split('/').pop()?.replace('/', '');
+      // Extract attendee ID from URL - Format: https://www.eventbriteapi.com/v3/events/1287687180019/attendees/19674182663/
+      const attendeeId = data.api_url.split('/attendees/')[1]?.replace('/', '');
+      console.log('🔍 URL del asistente:', data.api_url);
+      console.log('🔑 Attendee ID extraído:', attendeeId);
+
       if (!attendeeId) {
         throw new Error('No se pudo obtener el ID del asistente');
       }
@@ -203,17 +207,28 @@ export async function POST(request: Request) {
 
       // Get attendee data
       const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendeeId}/?expand=profile,answers`;
+      console.log('🌐 URL de la petición:', url);
+
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`
+          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+          'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) {
-        throw new Error(`Error obteniendo datos del asistente: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Error obteniendo datos del asistente. Status:', response.status);
+        console.error('📝 Error detallado:', errorText);
+        throw new Error(`Error obteniendo datos del asistente: ${response.status} - ${errorText}`);
       }
 
       const attendeeData = await response.json();
+      console.log('✅ Datos del asistente recibidos:', {
+        email: attendeeData.profile?.email,
+        name: `${attendeeData.profile?.first_name} ${attendeeData.profile?.last_name}`.trim()
+      });
+
       try {
         const result = await processAttendee(attendeeData);
         results.processed.push(result);
