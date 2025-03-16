@@ -26,82 +26,111 @@ export async function POST(req: Request) {
     
     // Verify environment variables
     console.log('🔑 Verificando variables de entorno:');
-    console.log('- EVENTBRITE_EVENT_ID:', process.env.EVENTBRITE_EVENT_ID ? '✅' : '❌');
+    console.log('- EVENTBRITE_EVENT_ID:', process.env.EVENTBRITE_EVENT_ID);
     console.log('- EVENTBRITE_API_KEY:', process.env.EVENTBRITE_API_KEY ? '✅' : '❌');
-    console.log('- EVENTBRITE_DOCUMENTO_QUESTION_ID:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID ? '✅' : '❌');
+    console.log('- EVENTBRITE_DOCUMENTO_QUESTION_ID:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
 
     if (!process.env.EVENTBRITE_EVENT_ID || !process.env.EVENTBRITE_API_KEY || !process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID) {
-      throw new Error('Missing required environment variables');
+      throw new Error('Faltan variables de entorno requeridas');
     }
 
     // Connect to MongoDB
     console.log('🔄 Conectando a MongoDB...');
-    await connectDB();
-    console.log('✅ Conexión a MongoDB establecida');
+    try {
+      await connectDB();
+      console.log('✅ Conexión a MongoDB establecida');
+    } catch (dbError) {
+      console.error('❌ Error conectando a MongoDB:', dbError);
+      throw new Error('Error de conexión a la base de datos');
+    }
 
     // Get attendees from Eventbrite
     console.log('🔍 Obteniendo asistentes de Eventbrite...');
-    const attendees = await getEventbriteAttendees();
-    console.log(`✅ ${attendees.length} asistentes procesados`);
+    let attendees;
+    try {
+      attendees = await getEventbriteAttendees();
+      console.log(`✅ ${attendees.length} asistentes encontrados:`, 
+        attendees.map(a => ({ email: a.email, name: a.name })));
+    } catch (eventbriteError) {
+      console.error('❌ Error obteniendo asistentes de Eventbrite:', eventbriteError);
+      throw new Error('Error obteniendo asistentes de Eventbrite');
+    }
 
     // Process each attendee
     for (const attendee of attendees) {
-      console.log(`🔄 Procesando asistente: ${attendee.email}`);
-      console.log('📝 Datos completos del asistente:', {
-        id: attendee.id,
-        name: attendee.name,
-        email: attendee.email
-      });
-
-      // Find documento in answers
-      console.log(`🔍 Buscando documento con Question ID: ${process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID}`);
-      
-      let documento = null;
-      if (attendee.answers && Array.isArray(attendee.answers)) {
-        const documentoAnswer = attendee.answers.find(
-          (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
-        );
-        if (documentoAnswer) {
-          documento = documentoAnswer.answer;
-        }
-      }
-
-      if (!documento) {
-        console.log('⚠️ No se encontró documento para:', attendee.email);
-        console.log('❓ Question ID configurado:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
-        console.log('📋 Todas las respuestas disponibles:', JSON.stringify(attendee.answers, null, 2));
-        results.errors++;
-        results.details.push(`No se encontró documento para: ${attendee.email} - IDs disponibles: ${attendee.answers?.map((a: any) => a.question_id).join(', ')}`);
-        continue;
-      }
-
-      // Create or update user
-      const existingUser = await User.findOne({ email: attendee.email });
-      
-      if (existingUser) {
-        existingUser.name = attendee.name;
-        existingUser.documento = documento;
-        await existingUser.save();
-        console.log('✅ Usuario actualizado:', attendee.email);
-        results.updated++;
-      } else {
-        const newUser = new User({
+      try {
+        console.log(`\n🔄 Procesando asistente: ${attendee.email}`);
+        console.log('📝 Datos completos del asistente:', {
+          id: attendee.id,
           name: attendee.name,
           email: attendee.email,
-          documento: documento,
-          role: 'student'
+          answers: attendee.answers
         });
-        await newUser.save();
-        console.log('✅ Usuario creado:', attendee.email);
-        results.created++;
+
+        // Find documento in answers
+        console.log(`🔍 Buscando documento con Question ID: ${process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID}`);
+        
+        let documento = null;
+        if (attendee.answers && Array.isArray(attendee.answers)) {
+          console.log('📋 Respuestas disponibles:', attendee.answers);
+          const documentoAnswer = attendee.answers.find(
+            (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
+          );
+          if (documentoAnswer) {
+            documento = documentoAnswer.answer;
+            console.log('✅ Documento encontrado:', documento);
+          }
+        }
+
+        if (!documento) {
+          console.log('⚠️ No se encontró documento para:', attendee.email);
+          console.log('❓ Question ID configurado:', process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID);
+          results.errors++;
+          results.details.push(`No se encontró documento para: ${attendee.email}`);
+          continue;
+        }
+
+        // Create or update user
+        try {
+          const existingUser = await User.findOne({ email: attendee.email });
+          
+          if (existingUser) {
+            existingUser.name = attendee.name;
+            existingUser.documento = documento;
+            await existingUser.save();
+            console.log('✅ Usuario actualizado:', attendee.email);
+            results.updated++;
+          } else {
+            const newUser = new User({
+              name: attendee.name,
+              email: attendee.email,
+              documento: documento,
+              role: 'student'
+            });
+            await newUser.save();
+            console.log('✅ Usuario creado:', attendee.email);
+            results.created++;
+          }
+        } catch (userError) {
+          console.error('❌ Error procesando usuario:', userError);
+          results.errors++;
+          results.details.push(`Error procesando usuario ${attendee.email}: ${userError.message}`);
+        }
+      } catch (attendeeError) {
+        console.error('❌ Error procesando asistente:', attendeeError);
+        results.errors++;
+        results.details.push(`Error general procesando asistente ${attendee.email}: ${attendeeError.message}`);
       }
     }
 
-    console.log('✅ Sincronización completada:', results);
+    console.log('\n✅ Sincronización completada:', results);
     return NextResponse.json(results);
 
   } catch (error) {
     console.error('❌ Error durante la sincronización:', error);
-    return NextResponse.json({ error: 'Error during synchronization' }, { status: 500 });
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : 'Error desconocido durante la sincronización',
+      details: results
+    }, { status: 500 });
   }
 } 
