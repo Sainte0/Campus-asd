@@ -1,15 +1,44 @@
 import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
-import connectDB from '@/lib/db';
 import Section from '@/models/Section';
 import { options } from '../auth/[...nextauth]/options';
 
 // GET /api/sections - Obtener todas las secciones
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await connectDB();
-    const sections = await Section.find().sort({ weekNumber: 1 });
-    return NextResponse.json(sections);
+    const session = await getServerSession(options);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const skip = (page - 1) * limit;
+
+    const { db } = await connectToDatabase();
+    
+    // Obtener el total de documentos para la paginación
+    const total = await db.collection('sections').countDocuments();
+    
+    // Obtener las secciones con paginación y ordenadas por número de semana
+    const sections = await db.collection('sections')
+      .find({})
+      .sort({ weekNumber: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    return NextResponse.json({
+      sections,
+      pagination: {
+        total,
+        pages: Math.ceil(total / limit),
+        currentPage: page,
+        perPage: limit
+      }
+    });
   } catch (error) {
     console.error('Error al obtener secciones:', error);
     return NextResponse.json(

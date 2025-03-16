@@ -7,6 +7,9 @@ import { ObjectId } from 'mongodb';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Cache duration: 1 hora
+const CACHE_DURATION = 60 * 60;
+
 export async function GET(
   request: Request,
   { params }: { params: { fileId: string } }
@@ -63,8 +66,13 @@ export async function GET(
     // Si es un PDF y no se solicita descarga, mostrarlo en el navegador
     if (file.type === 'application/pdf' && !forceDownload) {
       response.headers.set('Content-Disposition', 'inline');
+      // Agregar headers de caché para PDFs
+      response.headers.set('Cache-Control', `public, max-age=${CACHE_DURATION}`);
+      response.headers.set('ETag', `"${fileId}-${file.size}"`);
     } else {
       response.headers.set('Content-Disposition', `attachment; filename="${file.name}"`);
+      // No cachear descargas
+      response.headers.set('Cache-Control', 'no-store');
     }
     
     response.headers.set('Content-Length', buffer.length.toString());

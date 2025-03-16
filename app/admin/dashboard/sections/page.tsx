@@ -14,6 +14,13 @@ interface Section {
   pdfUrl?: string;
 }
 
+interface PaginationInfo {
+  total: number;
+  pages: number;
+  currentPage: number;
+  perPage: number;
+}
+
 export default function SectionsManagement() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -31,21 +38,29 @@ export default function SectionsManagement() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null);
+
   useEffect(() => {
     if (status === 'loading') return;
     
     if (!session || session.user?.role !== 'admin') {
       router.push('/');
     } else {
-      fetchSections();
+      fetchSections(currentPage);
     }
-  }, [session, status, router]);
+  }, [session, status, router, currentPage]);
 
-  const fetchSections = async () => {
+  const fetchSections = async (page: number = 1) => {
     try {
-      const response = await fetch('/api/sections');
+      const response = await fetch(`/api/sections?page=${page}&limit=10`);
       const data = await response.json();
-      setSections(Array.isArray(data) ? data : []);
+      if (response.ok) {
+        setSections(data.sections);
+        setPaginationInfo(data.pagination);
+      } else {
+        throw new Error(data.error || 'Error al cargar las secciones');
+      }
     } catch (error) {
       console.error('Error al obtener secciones:', error);
       setError('Error al cargar las secciones');
@@ -165,7 +180,7 @@ export default function SectionsManagement() {
       }
 
       // Actualizar la lista de secciones
-      await fetchSections();
+      await fetchSections(currentPage);
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Error al crear la sección');
@@ -228,7 +243,7 @@ export default function SectionsManagement() {
       }
 
       // Actualizar la lista de secciones
-      await fetchSections();
+      await fetchSections(currentPage);
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Error al actualizar la sección');
@@ -251,11 +266,15 @@ export default function SectionsManagement() {
       }
 
       // Actualizar la lista de secciones
-      await fetchSections();
+      await fetchSections(currentPage);
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Error al eliminar la sección');
     }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
   };
 
   if (status === 'loading') {
@@ -265,6 +284,40 @@ export default function SectionsManagement() {
   if (!session || session.user?.role !== 'admin') {
     return null;
   }
+
+  const renderPagination = () => {
+    if (!paginationInfo) return null;
+
+    return (
+      <div className="flex justify-center mt-4 space-x-2">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }`}
+        >
+          Anterior
+        </button>
+        <span className="px-3 py-1">
+          Página {currentPage} de {paginationInfo.pages}
+        </span>
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === paginationInfo.pages}
+          className={`px-3 py-1 rounded ${
+            currentPage === paginationInfo.pages
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }`}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -460,62 +513,65 @@ export default function SectionsManagement() {
             ) : sections.length === 0 ? (
               <p>No hay secciones creadas aún.</p>
             ) : (
-              <div className="grid gap-4">
-                {sections.map((section) => (
-                  <div
-                    key={section._id}
-                    className="border rounded-lg p-4 hover:bg-gray-50"
-                  >
-                    <h4 className="text-lg font-medium">
-                      Semana {section.weekNumber}: {section.title}
-                    </h4>
-                    <p className="text-gray-600 mt-1">{section.description}</p>
-                    <div className="mt-2 space-x-2">
-                      <a
-                        href={section.videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Ver Video
-                      </a>
-                      {section.pdfUrl && (
-                        <div className="space-x-2">
-                          <a
-                            href={section.pdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            Ver PDF
-                          </a>
-                          <a
-                            href={`${section.pdfUrl}?download=true`}
-                            className="text-blue-600 hover:text-blue-800"
-                            download
-                          >
-                            Descargar PDF
-                          </a>
-                        </div>
-                      )}
+              <>
+                <div className="grid gap-4">
+                  {sections.map((section) => (
+                    <div
+                      key={section._id}
+                      className="border rounded-lg p-4 hover:bg-gray-50"
+                    >
+                      <h4 className="text-lg font-medium">
+                        Semana {section.weekNumber}: {section.title}
+                      </h4>
+                      <p className="text-gray-600 mt-1">{section.description}</p>
+                      <div className="mt-2 space-x-2">
+                        <a
+                          href={section.videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          Ver Video
+                        </a>
+                        {section.pdfUrl && (
+                          <div className="space-x-2">
+                            <a
+                              href={section.pdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              Ver PDF
+                            </a>
+                            <a
+                              href={`${section.pdfUrl}?download=true`}
+                              className="text-blue-600 hover:text-blue-800"
+                              download
+                            >
+                              Descargar PDF
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          onClick={() => handleEdit(section)}
+                          className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(section._id)}
+                          className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => handleEdit(section)}
-                        className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-3 rounded text-sm"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(section._id)}
-                        className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {renderPagination()}
+              </>
             )}
           </div>
         </div>
