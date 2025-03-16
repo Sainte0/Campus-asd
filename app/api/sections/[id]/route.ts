@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
-import connectDB from '@/lib/db';
-import Section from '@/models/Section';
 import { options } from '../../auth/[...nextauth]/options';
+import { ObjectId } from 'mongodb';
 
 // PUT /api/sections/[id] - Actualizar una sección
 export async function PUT(
@@ -12,6 +12,7 @@ export async function PUT(
   try {
     const session = await getServerSession(options);
     
+    // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'No autorizado - Se requieren permisos de administrador' },
@@ -19,23 +20,30 @@ export async function PUT(
       );
     }
 
-    await connectDB();
+    const { db } = await connectToDatabase();
     const data = await request.json();
-    
-    const section = await Section.findByIdAndUpdate(
-      params.id,
-      data,
-      { new: true, runValidators: true }
+    const { id } = params;
+
+    // Actualizar la sección
+    const result = await db.collection('sections').findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          ...data,
+          updatedAt: new Date()
+        }
+      },
+      { returnDocument: 'after' }
     );
 
-    if (!section) {
+    if (!result) {
       return NextResponse.json(
         { error: 'Sección no encontrada' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(section);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error al actualizar sección:', error);
     return NextResponse.json(
@@ -53,6 +61,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(options);
     
+    // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'No autorizado - Se requieren permisos de administrador' },
@@ -60,10 +69,15 @@ export async function DELETE(
       );
     }
 
-    await connectDB();
-    const section = await Section.findByIdAndDelete(params.id);
+    const { db } = await connectToDatabase();
+    const { id } = params;
 
-    if (!section) {
+    // Eliminar la sección
+    const result = await db.collection('sections').deleteOne({
+      _id: new ObjectId(id)
+    });
+
+    if (result.deletedCount === 0) {
       return NextResponse.json(
         { error: 'Sección no encontrada' },
         { status: 404 }

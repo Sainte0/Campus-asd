@@ -61,11 +61,22 @@ export async function POST(request: Request) {
       );
     }
 
-    await connectDB();
+    const { db } = await connectToDatabase();
     const data = await request.json();
     
-    const section = await Section.create(data);
-    return NextResponse.json(section, { status: 201 });
+    // Crear la nueva sección
+    const result = await db.collection('sections').insertOne({
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    // Obtener la sección recién creada
+    const newSection = await db.collection('sections').findOne({
+      _id: result.insertedId
+    });
+
+    return NextResponse.json(newSection, { status: 201 });
   } catch (error) {
     console.error('Error al crear sección:', error);
     return NextResponse.json(
