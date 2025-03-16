@@ -101,10 +101,13 @@ export async function POST(req: Request) {
             console.log('✅ Usuario actualizado:', attendee.email);
             results.updated++;
           } else {
+            // Hash the documento to use as password
+            const hashedPassword = await bcrypt.hash(documento, 10);
             const newUser = new User({
               name: attendee.name,
               email: attendee.email,
               documento: documento,
+              password: hashedPassword,
               role: 'student'
             });
             await newUser.save();
