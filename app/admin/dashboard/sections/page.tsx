@@ -480,14 +480,23 @@ export default function SectionsManagement() {
                         Ver Video
                       </a>
                       {section.pdfUrl && (
-                        <a
-                          href={section.pdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          Ver PDF
-                        </a>
+                        <div className="space-x-2">
+                          <a
+                            href={section.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            Ver PDF
+                          </a>
+                          <a
+                            href={`${section.pdfUrl}?download=true`}
+                            className="text-blue-600 hover:text-blue-800"
+                            download
+                          >
+                            Descargar PDF
+                          </a>
+                        </div>
                       )}
                     </div>
                     <div className="mt-4 flex gap-2">

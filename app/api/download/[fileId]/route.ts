@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: { fileId: string } }
 ) {
   try {
-    console.log('📥 Iniciando descarga de archivo...');
+    console.log('📥 Iniciando proceso de archivo...');
     
     const session = await getServerSession(options);
     
@@ -25,6 +25,8 @@ export async function GET(
     }
 
     const { fileId } = params;
+    const url = new URL(request.url);
+    const forceDownload = url.searchParams.get('download') === 'true';
     
     if (!fileId) {
       console.log('❌ No se proporcionó ID del archivo');
@@ -57,17 +59,24 @@ export async function GET(
 
     // Configurar los headers apropiados
     response.headers.set('Content-Type', file.type);
-    response.headers.set('Content-Disposition', `attachment; filename="${file.name}"`);
+    
+    // Si es un PDF y no se solicita descarga, mostrarlo en el navegador
+    if (file.type === 'application/pdf' && !forceDownload) {
+      response.headers.set('Content-Disposition', 'inline');
+    } else {
+      response.headers.set('Content-Disposition', `attachment; filename="${file.name}"`);
+    }
+    
     response.headers.set('Content-Length', buffer.length.toString());
 
     console.log('✅ Archivo enviado exitosamente');
     return response;
 
   } catch (error) {
-    console.error('❌ Error al descargar archivo:', error);
+    console.error('❌ Error al procesar archivo:', error);
     return NextResponse.json(
       { 
-        error: 'Error al descargar el archivo',
+        error: 'Error al procesar el archivo',
         details: error instanceof Error ? error.message : 'Error desconocido'
       },
       { status: 500 }
