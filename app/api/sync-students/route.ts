@@ -13,6 +13,8 @@ interface SyncResults {
   details: string[];
 }
 
+const BATCH_SIZE = 5; // Procesar 5 estudiantes a la vez
+
 export async function POST(req: Request) {
   const results: SyncResults = {
     created: 0,
@@ -56,73 +58,84 @@ export async function POST(req: Request) {
       throw new Error('Error obteniendo asistentes de Eventbrite');
     }
 
-    // Process each attendee
-    for (const attendee of attendees) {
-      try {
-        console.log(`\n🔄 Procesando asistente: ${attendee.email}`);
-        console.log('📝 Datos completos del asistente:', {
-          id: attendee.id,
-          name: attendee.name,
-          email: attendee.email,
-          event_id: attendee.event_id,
-          answers: attendee.answers
-        });
-
-        // Find documento in answers
-        const dniQuestionId = attendee.event_id === process.env.EVENTBRITE_EVENT_ID_1 ? '287305383' : '287346273';
-        console.log(`🔍 Buscando documento con Question ID: ${dniQuestionId}`);
-        
-        let documento = null;
-        if (attendee.answers && Array.isArray(attendee.answers)) {
-          console.log('📋 Respuestas disponibles:', attendee.answers);
-          const documentoAnswer = attendee.answers.find(
-            (answer: any) => answer.question_id === dniQuestionId
-          );
-          if (documentoAnswer) {
-            documento = documentoAnswer.answer;
-            console.log('✅ Documento encontrado:', documento);
-          }
-        }
-
-        if (!documento) {
-          console.log('⚠️ No se encontró documento para:', attendee.email);
-          console.log('❓ Question ID configurado:', dniQuestionId);
-          results.errors++;
-          results.details.push(`No se encontró documento para: ${attendee.email}`);
-          continue;
-        }
-
-        // Create or update user
+    // Process attendees in batches
+    for (let i = 0; i < attendees.length; i += BATCH_SIZE) {
+      const batch = attendees.slice(i, i + BATCH_SIZE);
+      console.log(`\n🔄 Procesando lote ${Math.floor(i/BATCH_SIZE) + 1} de ${Math.ceil(attendees.length/BATCH_SIZE)}`);
+      
+      // Process each attendee in the batch
+      for (const attendee of batch) {
         try {
-          const existingUser = await User.findOne({ email: attendee.email });
+          console.log(`\n🔄 Procesando asistente: ${attendee.email}`);
+          console.log('📝 Datos completos del asistente:', {
+            id: attendee.id,
+            name: attendee.name,
+            email: attendee.email,
+            event_id: attendee.event_id,
+            answers: attendee.answers
+          });
+
+          // Find documento in answers
+          const dniQuestionId = attendee.event_id === process.env.EVENTBRITE_EVENT_ID_1 ? '287305383' : '287346273';
+          console.log(`🔍 Buscando documento con Question ID: ${dniQuestionId}`);
           
-          if (existingUser) {
-            existingUser.name = attendee.name;
-            existingUser.documento = documento;
-            await existingUser.save();
-            results.updated++;
-            results.details.push(`Usuario actualizado: ${attendee.email}`);
-          } else {
-            const hashedPassword = await bcrypt.hash(documento, 10);
-            await User.create({
-              name: attendee.name,
-              email: attendee.email,
-              documento,
-              password: hashedPassword,
-              role: 'student'
-            });
-            results.created++;
-            results.details.push(`Usuario creado: ${attendee.email}`);
+          let documento = null;
+          if (attendee.answers && Array.isArray(attendee.answers)) {
+            console.log('📋 Respuestas disponibles:', attendee.answers);
+            const documentoAnswer = attendee.answers.find(
+              (answer: any) => answer.question_id === dniQuestionId
+            );
+            if (documentoAnswer) {
+              documento = documentoAnswer.answer;
+              console.log('✅ Documento encontrado:', documento);
+            }
           }
-        } catch (userError: any) {
-          console.error('❌ Error procesando usuario:', userError);
+
+          if (!documento) {
+            console.log('⚠️ No se encontró documento para:', attendee.email);
+            console.log('❓ Question ID configurado:', dniQuestionId);
+            results.errors++;
+            results.details.push(`No se encontró documento para: ${attendee.email}`);
+            continue;
+          }
+
+          // Create or update user
+          try {
+            const existingUser = await User.findOne({ email: attendee.email });
+            
+            if (existingUser) {
+              existingUser.name = attendee.name;
+              existingUser.documento = documento;
+              await existingUser.save();
+              results.updated++;
+              results.details.push(`Usuario actualizado: ${attendee.email}`);
+            } else {
+              const hashedPassword = await bcrypt.hash(documento, 10);
+              await User.create({
+                name: attendee.name,
+                email: attendee.email,
+                documento,
+                password: hashedPassword,
+                role: 'student'
+              });
+              results.created++;
+              results.details.push(`Usuario creado: ${attendee.email}`);
+            }
+          } catch (userError: any) {
+            console.error('❌ Error procesando usuario:', userError);
+            results.errors++;
+            results.details.push(`Error procesando usuario ${attendee.email}: ${userError?.message || 'Error desconocido'}`);
+          }
+        } catch (attendeeError: any) {
+          console.error('❌ Error procesando asistente:', attendeeError);
           results.errors++;
-          results.details.push(`Error procesando usuario ${attendee.email}: ${userError?.message || 'Error desconocido'}`);
+          results.details.push(`Error procesando asistente ${attendee.email}: ${attendeeError?.message || 'Error desconocido'}`);
         }
-      } catch (attendeeError: any) {
-        console.error('❌ Error procesando asistente:', attendeeError);
-        results.errors++;
-        results.details.push(`Error procesando asistente ${attendee.email}: ${attendeeError?.message || 'Error desconocido'}`);
+      }
+
+      // Add a small delay between batches to avoid rate limiting
+      if (i + BATCH_SIZE < attendees.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
