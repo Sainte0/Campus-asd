@@ -96,6 +96,17 @@ async function processAttendee(attendee: any) {
     attendeeId: attendee.id
   });
   
+  // Validar si es un asistente con información pendiente
+  if (name === 'Info Requested Info Requested' || email === 'Info Requested') {
+    console.log('⚠️ Asistente con información pendiente, saltando...');
+    return { 
+      action: 'skipped', 
+      email, 
+      eventId,
+      reason: 'info_requested'
+    };
+  }
+
   if (!email || !name) {
     throw new Error('Datos de perfil incompletos');
   }
@@ -121,7 +132,13 @@ async function processAttendee(attendee: any) {
   }
 
   if (!documento) {
-    throw new Error(`No se encontró documento para: ${email}`);
+    console.log('⚠️ No se encontró documento para:', email);
+    return { 
+      action: 'skipped', 
+      email, 
+      eventId,
+      reason: 'no_documento'
+    };
   }
 
   // Create or update user
@@ -178,7 +195,15 @@ export async function POST(request: Request) {
       status: 'success',
       action,
       processed: [] as any[],
-      eventId: null as string | null
+      eventId: null as string | null,
+      summary: {
+        total: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+        skippedReasons: {} as Record<string, number>
+      }
     };
 
     if (action === 'order.placed' || action === 'order.updated') {
@@ -205,11 +230,21 @@ export async function POST(request: Request) {
       }, {});
       console.log('📊 Distribución de asistentes por evento:', eventDistribution);
 
+      results.summary.total = attendees.length;
+
       for (const attendee of attendees) {
         try {
           const result = await processAttendee(attendee);
           results.processed.push(result);
           results.eventId = attendee.event_id;
+
+          // Update summary
+          if (result.action === 'created') results.summary.created++;
+          else if (result.action === 'updated') results.summary.updated++;
+          else if (result.action === 'skipped') {
+            results.summary.skipped++;
+            results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
+          }
         } catch (error) {
           console.error('❌ Error procesando asistente:', error);
           results.processed.push({ 
@@ -218,6 +253,7 @@ export async function POST(request: Request) {
             eventId: attendee.event_id,
             error: error instanceof Error ? error.message : 'Error desconocido'
           });
+          results.summary.errors++;
         }
       }
     } else if (action === 'attendee.updated') {
