@@ -31,6 +31,7 @@ export interface EventbriteAttendee {
   id: string;
   name: string;
   email: string;
+  event_id: string;
   answers?: Array<{
     question_id: string;
     answer: string;
@@ -51,64 +52,57 @@ interface EventbriteResponse {
 }
 
 export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
-  console.log('🔄 Obteniendo asistentes de Eventbrite...');
-  console.log('📝 Variables de entorno configuradas:');
-  console.log('- EVENTBRITE_EVENT_ID:', process.env.EVENTBRITE_EVENT_ID);
-  console.log('- EVENTBRITE_API_KEY:', process.env.EVENTBRITE_API_KEY ? '✅' : '❌');
-  
-  // Get questions first
-  console.log('\n📝 Obteniendo preguntas del evento...');
-  const questions = await getEventbriteQuestions();
-  console.log('📋 Preguntas disponibles:', questions);
+  const EVENTBRITE_EVENT_ID_1 = process.env.EVENTBRITE_EVENT_ID_1;
+  const EVENTBRITE_EVENT_ID_2 = process.env.EVENTBRITE_EVENT_ID_2;
+  const EVENTBRITE_API_KEY = process.env.EVENTBRITE_API_KEY;
 
-  const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/?expand=profile,answers&status=attending`;
-  console.log('\n🌐 Obteniendo asistentes desde:', url);
-
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`
-    }
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('❌ Error al obtener asistentes. Status:', response.status);
-    console.error('❌ Error response:', errorText);
-    throw new Error(`Failed to fetch attendees: ${response.status} - ${errorText}`);
+  if (!EVENTBRITE_EVENT_ID_1 || !EVENTBRITE_EVENT_ID_2 || !EVENTBRITE_API_KEY) {
+    throw new Error('Faltan variables de entorno requeridas');
   }
 
-  const data = await response.json();
-  console.log('\n📊 Respuesta de Eventbrite:', {
-    pagination: data.pagination,
-    total_attendees: data.attendees?.length || 0
-  });
+  const attendees: EventbriteAttendee[] = [];
 
-  const attendees = data.attendees;
-  if (!attendees || !Array.isArray(attendees)) {
-    console.error('❌ No se encontraron asistentes o formato inválido');
-    console.error('📝 Datos recibidos:', data);
-    throw new Error('Invalid attendees data format');
+  // Obtener asistentes del primer evento
+  const response1 = await fetch(
+    `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID_1}/attendees/`,
+    {
+      headers: {
+        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`
+      }
+    }
+  );
+
+  if (!response1.ok) {
+    throw new Error(`Error obteniendo asistentes del primer evento: ${response1.statusText}`);
   }
 
-  console.log(`\n✅ ${attendees.length} asistentes encontrados`);
+  const data1 = await response1.json();
+  attendees.push(...data1.attendees.map((attendee: any) => ({
+    ...attendee,
+    event_id: EVENTBRITE_EVENT_ID_1
+  })));
 
-  return attendees.map((attendee: any) => {
-    console.log('\n👤 Procesando asistente:', attendee.profile?.email);
-    console.log('📝 Datos del perfil:', attendee.profile);
-    console.log('📝 Respuestas:', attendee.answers);
-    
-    if (!attendee.profile) {
-      console.error('❌ Asistente sin perfil:', attendee);
-      throw new Error(`Attendee ${attendee.id} has no profile`);
+  // Obtener asistentes del segundo evento
+  const response2 = await fetch(
+    `https://www.eventbriteapi.com/v3/events/${EVENTBRITE_EVENT_ID_2}/attendees/`,
+    {
+      headers: {
+        'Authorization': `Bearer ${EVENTBRITE_API_KEY}`
+      }
     }
+  );
 
-    return {
-      id: attendee.id,
-      name: `${attendee.profile.first_name} ${attendee.profile.last_name}`.trim(),
-      email: attendee.profile.email,
-      answers: attendee.answers
-    };
-  });
+  if (!response2.ok) {
+    throw new Error(`Error obteniendo asistentes del segundo evento: ${response2.statusText}`);
+  }
+
+  const data2 = await response2.json();
+  attendees.push(...data2.attendees.map((attendee: any) => ({
+    ...attendee,
+    event_id: EVENTBRITE_EVENT_ID_2
+  })));
+
+  return attendees;
 }
 
 export async function getEventbriteQuestions(): Promise<any[]> {
