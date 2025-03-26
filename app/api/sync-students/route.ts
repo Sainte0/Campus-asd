@@ -14,9 +14,11 @@ export async function POST() {
       throw new Error('EVENTBRITE_EVENT_ID_1 o EVENTBRITE_EVENT_ID_2 no están configurados');
     }
 
-    if (!process.env.EVENTBRITE_DNI_QUESTION_ID) {
-      throw new Error('EVENTBRITE_DNI_QUESTION_ID no está configurado');
-    }
+    // IDs de las preguntas DNI para cada evento
+    const DNI_QUESTION_IDS = {
+      [process.env.EVENTBRITE_EVENT_ID_1]: '287305383',
+      [process.env.EVENTBRITE_EVENT_ID_2]: '287346273'
+    };
 
     // Conectar a la base de datos
     const { db } = await connectToDatabase();
@@ -40,16 +42,17 @@ export async function POST() {
         console.log('Procesando asistente:', {
           email: attendee.profile.email,
           answers: attendee.answers,
-          dniQuestionId: process.env.EVENTBRITE_DNI_QUESTION_ID
+          eventId: attendee.event_id,
+          dniQuestionId: DNI_QUESTION_IDS[attendee.event_id]
         });
 
-        // Obtener el DNI del asistente
+        // Obtener el DNI del asistente usando el ID de pregunta correspondiente al evento
         const dniAnswer = attendee.answers.find(
-          (answer) => answer.question_id === process.env.EVENTBRITE_DNI_QUESTION_ID
+          (answer) => answer.question_id === DNI_QUESTION_IDS[attendee.event_id]
         );
 
         if (!dniAnswer) {
-          console.error(`No se encontró respuesta DNI para el asistente ${attendee.profile.email}`);
+          console.error(`No se encontró respuesta DNI para el asistente ${attendee.profile.email} en el evento ${attendee.event_id}`);
           results.errors++;
           results.pending.push(attendee.profile.email);
           continue;
