@@ -11,16 +11,85 @@ interface SyncResults {
   updated: number;
   errors: number;
   details: string[];
+  pending: string[]; // Lista de emails pendientes de procesar
 }
 
-const BATCH_SIZE = 5; // Procesar 5 estudiantes a la vez
+const BATCH_SIZE = 3; // Reducido a 3 estudiantes por lote
+const MAX_RETRIES = 3; // Número máximo de reintentos
+const DELAY_BETWEEN_BATCHES = 2000; // 2 segundos entre lotes
+
+async function processAttendee(attendee: any, results: SyncResults) {
+  try {
+    console.log(`\n🔄 Procesando asistente: ${attendee.email}`);
+    console.log('📝 Datos completos del asistente:', {
+      id: attendee.id,
+      name: attendee.name,
+      email: attendee.email,
+      event_id: attendee.event_id,
+      answers: attendee.answers
+    });
+
+    // Find documento in answers
+    const dniQuestionId = attendee.event_id === process.env.EVENTBRITE_EVENT_ID_1 ? '287305383' : '287346273';
+    console.log(`🔍 Buscando documento con Question ID: ${dniQuestionId}`);
+    
+    let documento = null;
+    if (attendee.answers && Array.isArray(attendee.answers)) {
+      console.log('📋 Respuestas disponibles:', attendee.answers);
+      const documentoAnswer = attendee.answers.find(
+        (answer: any) => answer.question_id === dniQuestionId
+      );
+      if (documentoAnswer) {
+        documento = documentoAnswer.answer;
+        console.log('✅ Documento encontrado:', documento);
+      }
+    }
+
+    if (!documento) {
+      console.log('⚠️ No se encontró documento para:', attendee.email);
+      console.log('❓ Question ID configurado:', dniQuestionId);
+      results.errors++;
+      results.details.push(`No se encontró documento para: ${attendee.email}`);
+      return false;
+    }
+
+    // Create or update user
+    const existingUser = await User.findOne({ email: attendee.email });
+    
+    if (existingUser) {
+      existingUser.name = attendee.name;
+      existingUser.documento = documento;
+      await existingUser.save();
+      results.updated++;
+      results.details.push(`Usuario actualizado: ${attendee.email}`);
+    } else {
+      const hashedPassword = await bcrypt.hash(documento, 10);
+      await User.create({
+        name: attendee.name,
+        email: attendee.email,
+        documento,
+        password: hashedPassword,
+        role: 'student'
+      });
+      results.created++;
+      results.details.push(`Usuario creado: ${attendee.email}`);
+    }
+    return true;
+  } catch (error: any) {
+    console.error('❌ Error procesando asistente:', error);
+    results.errors++;
+    results.details.push(`Error procesando asistente ${attendee.email}: ${error?.message || 'Error desconocido'}`);
+    return false;
+  }
+}
 
 export async function POST(req: Request) {
   const results: SyncResults = {
     created: 0,
     updated: 0,
     errors: 0,
-    details: []
+    details: [],
+    pending: []
   };
 
   try {
@@ -65,77 +134,30 @@ export async function POST(req: Request) {
       
       // Process each attendee in the batch
       for (const attendee of batch) {
-        try {
-          console.log(`\n🔄 Procesando asistente: ${attendee.email}`);
-          console.log('📝 Datos completos del asistente:', {
-            id: attendee.id,
-            name: attendee.name,
-            email: attendee.email,
-            event_id: attendee.event_id,
-            answers: attendee.answers
-          });
+        let success = false;
+        let retries = 0;
 
-          // Find documento in answers
-          const dniQuestionId = attendee.event_id === process.env.EVENTBRITE_EVENT_ID_1 ? '287305383' : '287346273';
-          console.log(`🔍 Buscando documento con Question ID: ${dniQuestionId}`);
-          
-          let documento = null;
-          if (attendee.answers && Array.isArray(attendee.answers)) {
-            console.log('📋 Respuestas disponibles:', attendee.answers);
-            const documentoAnswer = attendee.answers.find(
-              (answer: any) => answer.question_id === dniQuestionId
-            );
-            if (documentoAnswer) {
-              documento = documentoAnswer.answer;
-              console.log('✅ Documento encontrado:', documento);
+        while (!success && retries < MAX_RETRIES) {
+          success = await processAttendee(attendee, results);
+          if (!success) {
+            retries++;
+            if (retries < MAX_RETRIES) {
+              console.log(`🔄 Reintentando asistente ${attendee.email} (intento ${retries + 1}/${MAX_RETRIES})`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
             }
           }
+        }
 
-          if (!documento) {
-            console.log('⚠️ No se encontró documento para:', attendee.email);
-            console.log('❓ Question ID configurado:', dniQuestionId);
-            results.errors++;
-            results.details.push(`No se encontró documento para: ${attendee.email}`);
-            continue;
-          }
-
-          // Create or update user
-          try {
-            const existingUser = await User.findOne({ email: attendee.email });
-            
-            if (existingUser) {
-              existingUser.name = attendee.name;
-              existingUser.documento = documento;
-              await existingUser.save();
-              results.updated++;
-              results.details.push(`Usuario actualizado: ${attendee.email}`);
-            } else {
-              const hashedPassword = await bcrypt.hash(documento, 10);
-              await User.create({
-                name: attendee.name,
-                email: attendee.email,
-                documento,
-                password: hashedPassword,
-                role: 'student'
-              });
-              results.created++;
-              results.details.push(`Usuario creado: ${attendee.email}`);
-            }
-          } catch (userError: any) {
-            console.error('❌ Error procesando usuario:', userError);
-            results.errors++;
-            results.details.push(`Error procesando usuario ${attendee.email}: ${userError?.message || 'Error desconocido'}`);
-          }
-        } catch (attendeeError: any) {
-          console.error('❌ Error procesando asistente:', attendeeError);
-          results.errors++;
-          results.details.push(`Error procesando asistente ${attendee.email}: ${attendeeError?.message || 'Error desconocido'}`);
+        if (!success) {
+          results.pending.push(attendee.email);
+          results.details.push(`No se pudo procesar el asistente ${attendee.email} después de ${MAX_RETRIES} intentos`);
         }
       }
 
-      // Add a small delay between batches to avoid rate limiting
+      // Add a delay between batches
       if (i + BATCH_SIZE < attendees.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`⏳ Esperando ${DELAY_BETWEEN_BATCHES/1000} segundos antes del siguiente lote...`);
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
     }
 
