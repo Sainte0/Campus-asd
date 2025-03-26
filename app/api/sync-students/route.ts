@@ -3,6 +3,12 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { getEventbriteAttendees, EventbriteAttendee } from '@/lib/eventbrite';
 import { createStudent } from '@/lib/students';
 
+interface Student {
+  _id: any;
+  email: string;
+  createdAt?: Date;
+}
+
 export async function POST() {
   try {
     // Verificar variables de entorno
@@ -51,7 +57,7 @@ export async function POST() {
           continue;
         }
 
-        console.log('Procesando asistente nuevo:', {
+        console.log('Procesando asistente:', {
           email: attendee.profile.email,
           eventId: attendee.event_id
         });
@@ -80,27 +86,40 @@ export async function POST() {
 
         console.log('DNI encontrado:', dni);
 
-        // Crear nuevo estudiante
+        // Crear o actualizar estudiante
         const student = await createStudent({
           dni,
           name: attendee.profile.name,
           email: attendee.profile.email,
           role: 'student',
           eventId: attendee.event_id
-        });
+        }) as Student;
 
-        console.log('Estudiante creado:', student);
+        if (!student) {
+          console.error(`Error al crear/actualizar estudiante ${attendee.profile.email}`);
+          results.errors++;
+          results.pending.push(attendee.profile.email);
+          continue;
+        }
 
-        // Crear comisión para el estudiante
-        await studentCommissionsCollection.insertOne({
-          studentId: student._id,
-          commissionId: process.env.DEFAULT_COMMISSION_ID,
-          status: 'active',
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
+        // Si el estudiante fue creado (no existía antes)
+        if (student._id && !student.createdAt) {
+          console.log('Estudiante creado:', student);
 
-        results.created++;
+          // Crear comisión para el estudiante
+          await studentCommissionsCollection.insertOne({
+            studentId: student._id,
+            commissionId: process.env.DEFAULT_COMMISSION_ID,
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+
+          results.created++;
+        } else {
+          console.log('Estudiante ya existía:', student.email);
+          results.skipped++;
+        }
       } catch (error: any) {
         console.error(`Error procesando estudiante ${attendee.profile.email}:`, error);
         results.errors++;
