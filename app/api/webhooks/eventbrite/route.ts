@@ -51,6 +51,16 @@ const validActions = [
   'test' // Webhook de prueba de Eventbrite
 ];
 
+// Configuración de IDs de preguntas por evento
+const EVENT_QUESTIONS: Record<string, { dniQuestionId: string }> = {
+  '1300969166799': { // Evento 1
+    dniQuestionId: process.env.EVENTBRITE_DNI_QUESTION_ID || '287305383'
+  },
+  '1301112074239': { // Evento 2
+    dniQuestionId: process.env.EVENTBRITE_DNI_QUESTION_ID_2 || '287346273'
+  }
+};
+
 async function getOrderAttendees(orderId: string) {
   console.log('🔍 Obteniendo asistentes de la orden:', orderId);
   
@@ -151,6 +161,18 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
     };
   }
 
+  // Get the correct DNI question ID for this event
+  const eventConfig = EVENT_QUESTIONS[eventId];
+  if (!eventConfig) {
+    console.log('⚠️ No se encontró configuración para el evento:', eventId);
+    return {
+      action: 'skipped',
+      email,
+      eventId,
+      reason: 'invalid_event'
+    };
+  }
+
   // Find documento in answers
   console.log('🔍 Buscando documento en respuestas');
   let documento = null;
@@ -158,7 +180,7 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
   if (attendee.answers && Array.isArray(attendee.answers)) {
     console.log('📝 Respuestas disponibles:', JSON.stringify(attendee.answers, null, 2));
     const documentoAnswer = attendee.answers.find(
-      (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
+      (answer: any) => answer.question_id === eventConfig.dniQuestionId
     );
     if (documentoAnswer) {
       documento = documentoAnswer.answer;
@@ -264,6 +286,32 @@ export async function POST(request: Request) {
 
       console.log('🎫 Procesando orden:', orderId);
 
+      // Get order details first
+      const orderUrl = `https://www.eventbriteapi.com/v3/orders/${orderId}/?expand=event`;
+      console.log('🌐 Obteniendo detalles de la orden:', orderUrl);
+
+      const orderResponse = await fetch(orderUrl, {
+        headers: {
+          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        console.error('❌ Error obteniendo detalles de la orden. Status:', orderResponse.status);
+        console.error('📝 Error detallado:', errorText);
+        throw new Error(`Error obteniendo detalles de la orden: ${orderResponse.status} - ${errorText}`);
+      }
+
+      const orderData = await orderResponse.json();
+      console.log('✅ Detalles de la orden recibidos:', {
+        orderId: orderData.id,
+        eventId: orderData.event_id,
+        status: orderData.status,
+        total: orderData.total
+      });
+
       // Get and process all attendees in the order
       const attendees = await getOrderAttendees(orderId);
       console.log(`📋 Procesando ${attendees.length} asistentes`);
@@ -284,7 +332,8 @@ export async function POST(request: Request) {
           console.log('\n🔄 Procesando asistente:', {
             email: attendee.profile?.email,
             name: `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim(),
-            eventId: attendee.event_id
+            eventId: attendee.event_id,
+            answers: attendee.answers
           });
 
           const result = await processAttendee(attendee);
