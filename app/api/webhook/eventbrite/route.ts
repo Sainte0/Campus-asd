@@ -33,6 +33,14 @@ interface EventbriteWebhookPayload {
   order_id?: string;
 }
 
+interface ProcessResult {
+  action: 'created' | 'updated' | 'skipped' | 'error';
+  email: string;
+  eventId: string;
+  reason?: 'info_requested' | 'no_documento';
+  error?: string;
+}
+
 // Solo mantenemos las acciones que realmente necesitamos
 const validActions = [
   'order.placed',  // Cuando alguien paga
@@ -82,7 +90,7 @@ async function getOrderAttendees(orderId: string) {
   }
 }
 
-async function processAttendee(attendee: any) {
+async function processAttendee(attendee: any): Promise<ProcessResult> {
   console.log('\n👤 Procesando asistente:', attendee.profile?.email);
   
   const email = attendee.profile?.email;
@@ -194,7 +202,7 @@ export async function POST(request: Request) {
     const results = {
       status: 'success',
       action,
-      processed: [] as any[],
+      processed: [] as ProcessResult[],
       eventId: null as string | null,
       summary: {
         total: 0,
@@ -241,7 +249,7 @@ export async function POST(request: Request) {
           // Update summary
           if (result.action === 'created') results.summary.created++;
           else if (result.action === 'updated') results.summary.updated++;
-          else if (result.action === 'skipped') {
+          else if (result.action === 'skipped' && result.reason) {
             results.summary.skipped++;
             results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
           }
@@ -249,8 +257,8 @@ export async function POST(request: Request) {
           console.error('❌ Error procesando asistente:', error);
           results.processed.push({ 
             action: 'error', 
-            email: attendee.profile?.email,
-            eventId: attendee.event_id,
+            email: attendee.profile?.email || 'unknown',
+            eventId: attendee.event_id || 'unknown',
             error: error instanceof Error ? error.message : 'Error desconocido'
           });
           results.summary.errors++;
@@ -300,9 +308,11 @@ export async function POST(request: Request) {
         console.error('❌ Error procesando asistente:', error);
         results.processed.push({ 
           action: 'error',
-          email: attendeeData.profile?.email,
+          email: attendeeData.profile?.email || 'unknown',
+          eventId: attendeeData.event_id || 'unknown',
           error: error instanceof Error ? error.message : 'Error desconocido'
         });
+        results.summary.errors++;
       }
     }
 
