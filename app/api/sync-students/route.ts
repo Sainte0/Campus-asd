@@ -113,15 +113,15 @@ export async function POST(req: Request) {
             results.created++;
             results.details.push(`Usuario creado: ${attendee.email}`);
           }
-        } catch (userError) {
+        } catch (userError: any) {
           console.error('❌ Error procesando usuario:', userError);
           results.errors++;
-          results.details.push(`Error procesando usuario ${attendee.email}: ${userError.message}`);
+          results.details.push(`Error procesando usuario ${attendee.email}: ${userError?.message || 'Error desconocido'}`);
         }
-      } catch (attendeeError) {
+      } catch (attendeeError: any) {
         console.error('❌ Error procesando asistente:', attendeeError);
         results.errors++;
-        results.details.push(`Error procesando asistente ${attendee.email}: ${attendeeError.message}`);
+        results.details.push(`Error procesando asistente ${attendee.email}: ${attendeeError?.message || 'Error desconocido'}`);
       }
     }
 
@@ -130,12 +130,12 @@ export async function POST(req: Request) {
       message: 'Sincronización completada',
       results
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error general:', error);
     return NextResponse.json({
       success: false,
       message: 'Error en la sincronización',
-      error: error.message,
+      error: error?.message || 'Error desconocido',
       results
     }, { status: 500 });
   }
