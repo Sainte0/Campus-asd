@@ -301,7 +301,10 @@ export default function SectionsManagement() {
       if (data.success) {
         toast.success('Sincronización completada');
         if (data.nextBatch) {
-          toast.info(`${data.results.pending.length} estudiantes pendientes. Por favor, sincronice nuevamente.`);
+          toast(`${data.results.pending.length} estudiantes pendientes. Por favor, sincronice nuevamente.`, {
+            icon: 'ℹ️',
+            duration: 5000
+          });
         }
       } else {
         toast.error('Error en la sincronización');
