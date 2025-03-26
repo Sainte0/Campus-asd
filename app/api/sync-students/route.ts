@@ -37,19 +37,26 @@ export async function POST() {
     // Procesar todos los asistentes
     for (const attendee of attendees) {
       try {
+        console.log('Procesando asistente:', {
+          email: attendee.profile.email,
+          answers: attendee.answers,
+          dniQuestionId: process.env.EVENTBRITE_DNI_QUESTION_ID
+        });
+
         // Obtener el DNI del asistente
         const dniAnswer = attendee.answers.find(
           (answer) => answer.question_id === process.env.EVENTBRITE_DNI_QUESTION_ID
         );
 
-        if (!dniAnswer || !dniAnswer.answer) {
-          console.error(`No se encontró DNI para el asistente ${attendee.profile.email}`);
+        if (!dniAnswer) {
+          console.error(`No se encontró respuesta DNI para el asistente ${attendee.profile.email}`);
           results.errors++;
           results.pending.push(attendee.profile.email);
           continue;
         }
 
-        const dni = dniAnswer.answer.trim();
+        // Usar answer o text, dependiendo de cuál esté disponible
+        const dni = (dniAnswer.answer || dniAnswer.text || '').trim();
 
         if (!dni) {
           console.error(`DNI vacío para el asistente ${attendee.profile.email}`);
