@@ -11,6 +11,20 @@ interface Student {
   eventId?: string;
 }
 
+interface MissingStudent {
+  email: string;
+  name: string;
+  dni: string | undefined;
+}
+
+interface EventStats {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  missing: MissingStudent[];
+}
+
 export async function POST() {
   try {
     // Verificar variables de entorno
@@ -49,6 +63,21 @@ export async function POST() {
     console.log(`Evento 2 (${process.env.EVENTBRITE_EVENT_ID_2}): ${attendeesByEvent[process.env.EVENTBRITE_EVENT_ID_2]?.length || 0} asistentes`);
     console.log('=====================================\n');
 
+    // Obtener estudiantes existentes en la base de datos
+    const existingStudents = await usersCollection.find({}, { projection: { email: 1, documento: 1, eventId: 1 } }).toArray();
+    
+    // Mostrar resumen de estudiantes en la base de datos
+    const studentsByEvent = existingStudents.reduce((acc, student) => {
+      acc[student.eventId] = acc[student.eventId] || [];
+      acc[student.eventId].push(student);
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    console.log('\n=== Estudiantes en Base de Datos ===');
+    console.log(`Evento 1 (${process.env.EVENTBRITE_EVENT_ID_1}): ${studentsByEvent[process.env.EVENTBRITE_EVENT_ID_1]?.length || 0} estudiantes`);
+    console.log(`Evento 2 (${process.env.EVENTBRITE_EVENT_ID_2}): ${studentsByEvent[process.env.EVENTBRITE_EVENT_ID_2]?.length || 0} estudiantes`);
+    console.log('=====================================\n');
+
     const results = {
       totalStudents: attendees.length,
       created: 0,
@@ -57,23 +86,21 @@ export async function POST() {
       errors: 0,
       pending: [] as string[],
       byEvent: {
-        [process.env.EVENTBRITE_EVENT_ID_1]: { created: 0, updated: 0, skipped: 0, errors: 0 },
-        [process.env.EVENTBRITE_EVENT_ID_2]: { created: 0, updated: 0, skipped: 0, errors: 0 }
-      }
+        [process.env.EVENTBRITE_EVENT_ID_1]: { created: 0, updated: 0, skipped: 0, errors: 0, missing: [] as MissingStudent[] },
+        [process.env.EVENTBRITE_EVENT_ID_2]: { created: 0, updated: 0, skipped: 0, errors: 0, missing: [] as MissingStudent[] }
+      } as Record<string, EventStats>
     };
 
-    // Obtener todos los estudiantes existentes de una vez
-    const existingStudents = new Map(
-      (await usersCollection.find({}, { projection: { email: 1, documento: 1, eventId: 1 } }).toArray())
-        .map(student => [student.email, student])
-    );
+    // Crear mapa de estudiantes existentes para búsqueda rápida
+    const existingStudentsMap = new Map(existingStudents.map(student => [student.email, student]));
 
     // Procesar todos los asistentes
     for (const attendee of attendees) {
       try {
         console.log('Procesando asistente:', {
           email: attendee.profile.email,
-          eventId: attendee.event_id
+          eventId: attendee.event_id,
+          name: attendee.profile.name
         });
 
         // Obtener el DNI del asistente usando el ID de pregunta correspondiente al evento
@@ -102,7 +129,7 @@ export async function POST() {
 
         console.log('DNI encontrado:', dni);
 
-        const existingStudent = existingStudents.get(attendee.profile.email);
+        const existingStudent = existingStudentsMap.get(attendee.profile.email);
 
         if (existingStudent) {
           // Verificar si necesitamos actualizar
@@ -165,6 +192,22 @@ export async function POST() {
       }
     }
 
+    // Verificar estudiantes que faltan
+    for (const [eventId, eventAttendees] of Object.entries(attendeesByEvent)) {
+      const eventStudents = studentsByEvent[eventId] || [];
+      const eventEmails = new Set(eventStudents.map(s => s.email));
+      
+      for (const attendee of eventAttendees) {
+        if (!eventEmails.has(attendee.profile.email)) {
+          results.byEvent[eventId].missing.push({
+            email: attendee.profile.email,
+            name: attendee.profile.name,
+            dni: attendee.answers.find(a => a.question_id === DNI_QUESTION_IDS[eventId])?.answer
+          });
+        }
+      }
+    }
+
     // Mostrar resumen final por evento
     console.log('\n=== Resumen Final por Evento ===');
     Object.entries(results.byEvent).forEach(([eventId, stats]) => {
@@ -173,6 +216,12 @@ export async function POST() {
       console.log(`- Actualizados: ${stats.updated}`);
       console.log(`- Sin cambios: ${stats.skipped}`);
       console.log(`- Errores: ${stats.errors}`);
+      if (stats.missing.length > 0) {
+        console.log('\nEstudiantes que faltan:');
+        stats.missing.forEach(student => {
+          console.log(`- ${student.name} (${student.email}) - DNI: ${student.dni}`);
+        });
+      }
     });
     console.log('\n=====================================\n');
 
