@@ -97,11 +97,10 @@ export async function POST() {
     // Procesar todos los asistentes
     for (const attendee of attendees) {
       try {
-        console.log('Procesando asistente:', {
-          email: attendee.profile.email,
-          eventId: attendee.event_id,
-          name: attendee.profile.name
-        });
+        console.log('\n=== Procesando Asistente ===');
+        console.log('Email:', attendee.profile.email);
+        console.log('Evento:', attendee.event_id);
+        console.log('Nombre:', attendee.profile.name);
 
         // Obtener el DNI del asistente usando el ID de pregunta correspondiente al evento
         const dniAnswer = attendee.answers.find(
@@ -109,7 +108,7 @@ export async function POST() {
         );
 
         if (!dniAnswer) {
-          console.error(`No se encontró respuesta DNI para el asistente ${attendee.profile.email} en el evento ${attendee.event_id}`);
+          console.error(`❌ No se encontró respuesta DNI para el asistente ${attendee.profile.email} en el evento ${attendee.event_id}`);
           results.errors++;
           results.byEvent[attendee.event_id].errors++;
           results.pending.push(attendee.profile.email);
@@ -120,7 +119,7 @@ export async function POST() {
         const dni = (dniAnswer.answer || dniAnswer.text || '').trim();
 
         if (!dni) {
-          console.error(`DNI vacío para el asistente ${attendee.profile.email}`);
+          console.error(`❌ DNI vacío para el asistente ${attendee.profile.email}`);
           results.errors++;
           results.byEvent[attendee.event_id].errors++;
           results.pending.push(attendee.profile.email);
@@ -132,27 +131,35 @@ export async function POST() {
         const existingStudent = existingStudentsMap.get(attendee.profile.email);
 
         if (existingStudent) {
+          console.log('Estudiante existente encontrado:', {
+            email: existingStudent.email,
+            documento: existingStudent.documento,
+            eventId: existingStudent.eventId
+          });
+
           // Verificar si necesitamos actualizar
           const needsUpdate = 
             existingStudent.documento !== dni || 
             existingStudent.eventId !== attendee.event_id;
 
           if (needsUpdate) {
-            console.log('Actualizando estudiante existente:', existingStudent.email);
-            await updateStudent(existingStudent._id, {
+            console.log('🔄 Actualizando estudiante existente:', existingStudent.email);
+            const updateResult = await updateStudent(existingStudent._id, {
               dni,
               name: attendee.profile.name,
               email: attendee.profile.email,
               eventId: attendee.event_id
             });
+            console.log('Resultado de actualización:', updateResult);
             results.updated++;
             results.byEvent[attendee.event_id].updated++;
           } else {
-            console.log('Estudiante sin cambios:', existingStudent.email);
+            console.log('✅ Estudiante sin cambios:', existingStudent.email);
             results.skipped++;
             results.byEvent[attendee.event_id].skipped++;
           }
         } else {
+          console.log('📝 Creando nuevo estudiante...');
           // Crear nuevo estudiante
           const student = await createStudent({
             dni,
@@ -163,29 +170,36 @@ export async function POST() {
           }) as Student;
 
           if (!student) {
-            console.error(`Error al crear estudiante ${attendee.profile.email}`);
+            console.error(`❌ Error al crear estudiante ${attendee.profile.email}`);
             results.errors++;
             results.byEvent[attendee.event_id].errors++;
             results.pending.push(attendee.profile.email);
             continue;
           }
 
-          console.log('Estudiante creado:', student);
+          console.log('✅ Estudiante creado exitosamente:', {
+            id: student._id,
+            email: student.email,
+            documento: student.documento,
+            eventId: student.eventId
+          });
 
           // Crear comisión para el estudiante
-          await studentCommissionsCollection.insertOne({
+          const commissionResult = await studentCommissionsCollection.insertOne({
             studentId: student._id,
             commissionId: process.env.DEFAULT_COMMISSION_ID,
             status: 'active',
             createdAt: new Date(),
             updatedAt: new Date()
           });
+          console.log('✅ Comisión creada:', commissionResult);
 
           results.created++;
           results.byEvent[attendee.event_id].created++;
         }
+        console.log('=== Fin de Procesamiento ===\n');
       } catch (error: any) {
-        console.error(`Error procesando estudiante ${attendee.profile.email}:`, error);
+        console.error(`❌ Error procesando estudiante ${attendee.profile.email}:`, error);
         results.errors++;
         results.byEvent[attendee.event_id].errors++;
         results.pending.push(attendee.profile.email);
@@ -193,20 +207,28 @@ export async function POST() {
     }
 
     // Verificar estudiantes que faltan
+    console.log('\n=== Verificando Estudiantes Faltantes ===');
     for (const [eventId, eventAttendees] of Object.entries(attendeesByEvent)) {
       const eventStudents = studentsByEvent[eventId] || [];
       const eventEmails = new Set(eventStudents.map(s => s.email));
       
+      console.log(`\nEvento ${eventId}:`);
+      console.log(`Total asistentes: ${eventAttendees.length}`);
+      console.log(`Total en BD: ${eventStudents.length}`);
+      
       for (const attendee of eventAttendees) {
         if (!eventEmails.has(attendee.profile.email)) {
+          const dni = attendee.answers.find(a => a.question_id === DNI_QUESTION_IDS[eventId])?.answer;
+          console.log(`❌ Falta en BD: ${attendee.profile.name} (${attendee.profile.email}) - DNI: ${dni}`);
           results.byEvent[eventId].missing.push({
             email: attendee.profile.email,
             name: attendee.profile.name,
-            dni: attendee.answers.find(a => a.question_id === DNI_QUESTION_IDS[eventId])?.answer
+            dni
           });
         }
       }
     }
+    console.log('=== Fin de Verificación ===\n');
 
     // Mostrar resumen final por evento
     console.log('\n=== Resumen Final por Evento ===');
