@@ -1,19 +1,3 @@
-const EVENTBRITE_API_KEY = process.env.EVENTBRITE_API_KEY;
-const EVENTBRITE_ORGANIZATION_ID = process.env.EVENTBRITE_ORGANIZATION_ID;
-const EVENTBRITE_EVENT_ID = process.env.EVENTBRITE_EVENT_ID;
-
-if (!EVENTBRITE_API_KEY) {
-  throw new Error('Please define EVENTBRITE_API_KEY in your .env file');
-}
-
-if (!EVENTBRITE_ORGANIZATION_ID) {
-  throw new Error('Please define EVENTBRITE_ORGANIZATION_ID in your .env file');
-}
-
-if (!EVENTBRITE_EVENT_ID) {
-  throw new Error('Please define EVENTBRITE_EVENT_ID in your .env file');
-}
-
 interface EventbriteAnswer {
   question_id: string;
   answer: string;
