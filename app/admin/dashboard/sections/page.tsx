@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 
 interface Section {
   _id: string;
@@ -40,6 +41,10 @@ export default function SectionsManagement() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null);
+
+  const [syncingStudents, setSyncingStudents] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [syncResults, setSyncResults] = useState<any>(null);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -275,6 +280,38 @@ export default function SectionsManagement() {
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
+  };
+
+  const syncStudents = async () => {
+    try {
+      setSyncingStudents(true);
+      setSyncProgress(0);
+      setSyncResults(null);
+
+      const response = await fetch('/api/sync-students', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      setSyncResults(data);
+
+      if (data.success) {
+        toast.success('Sincronización completada');
+        if (data.nextBatch) {
+          toast.info(`${data.results.pending.length} estudiantes pendientes. Por favor, sincronice nuevamente.`);
+        }
+      } else {
+        toast.error('Error en la sincronización');
+      }
+    } catch (error) {
+      console.error('Error syncing students:', error);
+      toast.error('Error en la sincronización');
+    } finally {
+      setSyncingStudents(false);
+    }
   };
 
   if (status === 'loading') {
@@ -574,6 +611,50 @@ export default function SectionsManagement() {
               </>
             )}
           </div>
+
+          {/* Botón de sincronización */}
+          <button
+            onClick={syncStudents}
+            disabled={syncingStudents}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2"
+          >
+            {syncingStudents ? (
+              <>
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sincronizando...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Sincronizar estudiantes
+              </>
+            )}
+          </button>
+
+          {syncResults && (
+            <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+              <h3 className="font-semibold mb-2">Resultados de la sincronización:</h3>
+              <p>Total de estudiantes: {syncResults.results.totalStudents}</p>
+              <p>Estudiantes creados: {syncResults.results.created}</p>
+              <p>Estudiantes actualizados: {syncResults.results.updated}</p>
+              <p>Errores: {syncResults.results.errors}</p>
+              {syncResults.results.pending.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-yellow-600 font-semibold">
+                    {syncResults.results.pending.length} estudiantes pendientes
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Por favor, haga clic en "Sincronizar estudiantes" nuevamente para procesar el siguiente lote.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>
