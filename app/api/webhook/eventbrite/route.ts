@@ -37,7 +37,7 @@ interface ProcessResult {
   action: 'created' | 'updated' | 'skipped' | 'error';
   email: string;
   eventId: string;
-  reason?: 'info_requested' | 'no_documento';
+  reason?: 'info_requested' | 'no_documento' | 'invalid_event';
   error?: string;
 }
 
@@ -82,6 +82,14 @@ async function getOrderAttendees(orderId: string) {
       throw new Error('Formato de respuesta inválido');
     }
 
+    // Log event distribution
+    const eventDistribution = data.attendees.reduce((acc: any, attendee: any) => {
+      const eventId = attendee.event_id;
+      acc[eventId] = (acc[eventId] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('📊 Distribución de asistentes por evento:', eventDistribution);
+
     console.log('👥 Asistentes encontrados:', data.attendees.length);
     return data.attendees;
   } catch (error) {
@@ -122,6 +130,22 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
   // Validate event ID
   if (!eventId) {
     throw new Error('No se encontró el ID del evento');
+  }
+
+  // Validate event ID is one of the expected events
+  const validEventIds = [
+    '1300969166799', // Evento 1
+    '1301112074239'  // Evento 2
+  ];
+  
+  if (!validEventIds.includes(eventId)) {
+    console.log('⚠️ Evento no reconocido, saltando...');
+    return {
+      action: 'skipped',
+      email,
+      eventId,
+      reason: 'invalid_event'
+    };
   }
 
   // Find documento in answers
