@@ -65,10 +65,13 @@ export async function POST() {
           continue;
         }
 
+        console.log('DNI encontrado:', dni);
+
         // Verificar si el estudiante ya existe
         const existingUser = await usersCollection.findOne({ email: attendee.profile.email });
 
         if (existingUser) {
+          console.log('Actualizando estudiante existente:', existingUser._id);
           // Actualizar estudiante existente
           await updateStudent(existingUser._id, {
             dni,
@@ -78,6 +81,7 @@ export async function POST() {
           });
           results.updated++;
         } else {
+          console.log('Creando nuevo estudiante con DNI:', dni);
           // Crear nuevo estudiante
           const student = await createStudent({
             dni,
@@ -86,6 +90,8 @@ export async function POST() {
             role: 'student',
             eventId: attendee.event_id
           });
+
+          console.log('Estudiante creado:', student);
 
           // Crear comisión para el estudiante
           await studentCommissionsCollection.insertOne({
