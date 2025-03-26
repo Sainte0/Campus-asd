@@ -64,6 +64,7 @@ export async function POST(req: Request) {
           id: attendee.id,
           name: attendee.name,
           email: attendee.email,
+          event_id: attendee.event_id,
           answers: attendee.answers
         });
 
