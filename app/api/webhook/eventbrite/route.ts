@@ -31,6 +31,8 @@ interface EventbriteWebhookPayload {
   action?: string;
   attendee?: EventbriteAttendee;
   order_id?: string;
+  event_id?: string;
+  attendee_id?: string;
 }
 
 interface ProcessResult {
@@ -313,19 +315,20 @@ export async function POST(request: Request) {
       });
     } else if (action === 'attendee.updated') {
       // For attendee updates, we need to get the attendee data
-      // Extract attendee ID from URL - Format: https://www.eventbriteapi.com/v3/events/1287687180019/attendees/19674182663/
-      const attendeeId = data.api_url.split('/attendees/')[1]?.replace('/', '');
-      console.log('🔍 URL del asistente:', data.api_url);
-      console.log('🔑 Attendee ID extraído:', attendeeId);
+      const eventId = data.event_id;
+      const attendeeId = data.attendee_id;
+      
+      console.log('🔍 Procesando actualización de asistente:', {
+        eventId,
+        attendeeId
+      });
 
-      if (!attendeeId) {
-        throw new Error('No se pudo obtener el ID del asistente');
+      if (!eventId || !attendeeId) {
+        throw new Error('No se pudo obtener el ID del evento o del asistente');
       }
 
-      console.log('👤 Procesando actualización de asistente:', attendeeId);
-
       // Get attendee data
-      const url = `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID}/attendees/${attendeeId}/?expand=profile,answers`;
+      const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/${attendeeId}/?expand=profile,answers`;
       console.log('🌐 URL de la petición:', url);
 
       const response = await fetch(url, {
@@ -351,12 +354,26 @@ export async function POST(request: Request) {
       try {
         const result = await processAttendee(attendeeData);
         results.processed.push(result);
+        results.eventId = eventId;
+
+        // Update summary
+        if (result.action === 'created') {
+          results.summary.created++;
+          console.log('✅ Asistente creado exitosamente');
+        } else if (result.action === 'updated') {
+          results.summary.updated++;
+          console.log('✅ Asistente actualizado exitosamente');
+        } else if (result.action === 'skipped' && result.reason) {
+          results.summary.skipped++;
+          results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
+          console.log('⚠️ Asistente omitido:', result.reason);
+        }
       } catch (error) {
         console.error('❌ Error procesando asistente:', error);
         results.processed.push({ 
           action: 'error',
           email: attendeeData.profile?.email || 'unknown',
-          eventId: attendeeData.event_id || 'unknown',
+          eventId: eventId,
           error: error instanceof Error ? error.message : 'Error desconocido'
         });
         results.summary.errors++;
