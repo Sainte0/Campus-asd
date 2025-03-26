@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getEventbriteAttendees, EventbriteAttendee } from '@/lib/eventbrite';
-import { createStudent, updateStudent } from '@/lib/students';
+import { createStudent } from '@/lib/students';
 
 export async function POST() {
   try {
@@ -31,19 +31,29 @@ export async function POST() {
     const results = {
       totalStudents: attendees.length,
       created: 0,
-      updated: 0,
+      skipped: 0,
       errors: 0,
       pending: [] as string[]
     };
 
-    // Procesar todos los asistentes
+    // Obtener todos los emails existentes de una vez
+    const existingEmails = new Set(
+      (await usersCollection.find({}, { projection: { email: 1 } }).toArray())
+        .map(user => user.email)
+    );
+
+    // Procesar solo los asistentes nuevos
     for (const attendee of attendees) {
       try {
-        console.log('Procesando asistente:', {
+        // Si el email ya existe, lo saltamos
+        if (existingEmails.has(attendee.profile.email)) {
+          results.skipped++;
+          continue;
+        }
+
+        console.log('Procesando asistente nuevo:', {
           email: attendee.profile.email,
-          answers: attendee.answers,
-          eventId: attendee.event_id,
-          dniQuestionId: DNI_QUESTION_IDS[attendee.event_id]
+          eventId: attendee.event_id
         });
 
         // Obtener el DNI del asistente usando el ID de pregunta correspondiente al evento
@@ -70,43 +80,27 @@ export async function POST() {
 
         console.log('DNI encontrado:', dni);
 
-        // Verificar si el estudiante ya existe
-        const existingUser = await usersCollection.findOne({ email: attendee.profile.email });
+        // Crear nuevo estudiante
+        const student = await createStudent({
+          dni,
+          name: attendee.profile.name,
+          email: attendee.profile.email,
+          role: 'student',
+          eventId: attendee.event_id
+        });
 
-        if (existingUser) {
-          console.log('Actualizando estudiante existente:', existingUser._id);
-          // Actualizar estudiante existente
-          await updateStudent(existingUser._id, {
-            dni,
-            name: attendee.profile.name,
-            email: attendee.profile.email,
-            eventId: attendee.event_id
-          });
-          results.updated++;
-        } else {
-          console.log('Creando nuevo estudiante con DNI:', dni);
-          // Crear nuevo estudiante
-          const student = await createStudent({
-            dni,
-            name: attendee.profile.name,
-            email: attendee.profile.email,
-            role: 'student',
-            eventId: attendee.event_id
-          });
+        console.log('Estudiante creado:', student);
 
-          console.log('Estudiante creado:', student);
+        // Crear comisión para el estudiante
+        await studentCommissionsCollection.insertOne({
+          studentId: student._id,
+          commissionId: process.env.DEFAULT_COMMISSION_ID,
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
 
-          // Crear comisión para el estudiante
-          await studentCommissionsCollection.insertOne({
-            studentId: student._id,
-            commissionId: process.env.DEFAULT_COMMISSION_ID,
-            status: 'active',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-
-          results.created++;
-        }
+        results.created++;
       } catch (error: any) {
         console.error(`Error procesando estudiante ${attendee.profile.email}:`, error);
         results.errors++;
