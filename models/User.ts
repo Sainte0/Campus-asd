@@ -6,6 +6,7 @@ export interface IUser extends Document {
   name: string;
   role: 'student' | 'admin';
   eventbriteId?: string;
+  eventId: string;
   documento: string;
   status?: 'registered' | 'checked_in' | 'checked_out';
   createdAt: Date;
@@ -34,6 +35,10 @@ const userSchema = new mongoose.Schema({
   eventbriteId: {
     type: String,
     sparse: true,
+  },
+  eventId: {
+    type: String,
+    required: true,
   },
   documento: {
     type: String,

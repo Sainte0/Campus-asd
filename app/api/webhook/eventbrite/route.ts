@@ -87,9 +87,22 @@ async function processAttendee(attendee: any) {
   
   const email = attendee.profile?.email;
   const name = `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim();
+  const eventId = attendee.event_id;
+  
+  console.log('📋 Detalles del asistente:', {
+    email,
+    name,
+    eventId,
+    attendeeId: attendee.id
+  });
   
   if (!email || !name) {
     throw new Error('Datos de perfil incompletos');
+  }
+
+  // Validate event ID
+  if (!eventId) {
+    throw new Error('No se encontró el ID del evento');
   }
 
   // Find documento in answers
@@ -118,9 +131,11 @@ async function processAttendee(attendee: any) {
     console.log('📝 Actualizando usuario existente:', email);
     existingUser.name = name;
     existingUser.documento = documento;
+    existingUser.eventId = eventId;
+    existingUser.eventbriteId = attendee.id;
     await existingUser.save();
     console.log('✅ Usuario actualizado:', email);
-    return { action: 'updated', email };
+    return { action: 'updated', email, eventId };
   } else {
     console.log('👤 Creando nuevo usuario:', email);
     const hashedPassword = await bcrypt.hash(documento, 10);
@@ -129,11 +144,13 @@ async function processAttendee(attendee: any) {
       email,
       password: hashedPassword,
       documento,
-      role: 'student'
+      role: 'student',
+      eventId,
+      eventbriteId: attendee.id
     });
     await newUser.save();
     console.log('✅ Usuario creado:', email);
-    return { action: 'created', email };
+    return { action: 'created', email, eventId };
   }
 }
 
@@ -143,7 +160,7 @@ export async function POST(request: Request) {
     const data = await request.json() as EventbriteWebhookPayload;
     
     // Get action from config
-    const action = data.config.action; // La acción está en config.action
+    const action = data.config.action;
     console.log('📋 Acción recibida:', action);
     console.log('📝 Datos completos:', JSON.stringify(data, null, 2));
 
@@ -160,11 +177,12 @@ export async function POST(request: Request) {
     const results = {
       status: 'success',
       action,
-      processed: [] as any[]
+      processed: [] as any[],
+      eventId: null as string | null
     };
 
     if (action === 'order.placed' || action === 'order.updated') {
-      // Extract order ID from URL - Format: https://www.eventbriteapi.com/v3/orders/12005268593/
+      // Extract order ID from URL
       const orderId = data.api_url.split('/orders/')[1]?.replace('/', '');
       console.log('🔍 URL de la orden:', data.api_url);
       console.log('🔑 Order ID extraído:', orderId);
@@ -179,15 +197,25 @@ export async function POST(request: Request) {
       const attendees = await getOrderAttendees(orderId);
       console.log(`📋 Procesando ${attendees.length} asistentes`);
 
+      // Log event distribution
+      const eventDistribution = attendees.reduce((acc: any, attendee: any) => {
+        const eventId = attendee.event_id;
+        acc[eventId] = (acc[eventId] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📊 Distribución de asistentes por evento:', eventDistribution);
+
       for (const attendee of attendees) {
         try {
           const result = await processAttendee(attendee);
           results.processed.push(result);
+          results.eventId = attendee.event_id;
         } catch (error) {
           console.error('❌ Error procesando asistente:', error);
           results.processed.push({ 
             action: 'error', 
             email: attendee.profile?.email,
+            eventId: attendee.event_id,
             error: error instanceof Error ? error.message : 'Error desconocido'
           });
         }
