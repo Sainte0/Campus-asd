@@ -47,7 +47,8 @@ interface ProcessResult {
 const validActions = [
   'order.placed',  // Cuando alguien paga
   'order.updated', // Si hay cambios en la orden
-  'attendee.updated' // Si hay cambios en los datos del asistente
+  'attendee.updated', // Si hay cambios en los datos del asistente
+  'test' // Webhook de prueba de Eventbrite
 ];
 
 async function getOrderAttendees(orderId: string) {
@@ -219,6 +220,16 @@ export async function POST(request: Request) {
     if (!validActions.includes(action)) {
       console.log('⏭️ Acción ignorada:', action);
       return NextResponse.json({ status: 'ignored', action });
+    }
+
+    // Manejar webhook de prueba
+    if (action === 'test') {
+      console.log('✅ Webhook de prueba recibido correctamente');
+      return NextResponse.json({ 
+        status: 'success',
+        message: 'Webhook de prueba procesado correctamente',
+        config: data.config
+      });
     }
 
     // Connect to MongoDB
