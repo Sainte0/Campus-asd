@@ -213,6 +213,7 @@ export async function POST(request: Request) {
     console.log('📋 Acción recibida:', action);
     console.log('📝 Datos completos:', JSON.stringify(data, null, 2));
 
+    // Verificar que sea una acción válida
     if (!validActions.includes(action)) {
       console.log('⏭️ Acción ignorada:', action);
       return NextResponse.json({ status: 'ignored', action });
@@ -264,18 +265,30 @@ export async function POST(request: Request) {
 
       results.summary.total = attendees.length;
 
+      // Procesar cada asistente
       for (const attendee of attendees) {
         try {
+          console.log('\n🔄 Procesando asistente:', {
+            email: attendee.profile?.email,
+            name: `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim(),
+            eventId: attendee.event_id
+          });
+
           const result = await processAttendee(attendee);
           results.processed.push(result);
           results.eventId = attendee.event_id;
 
           // Update summary
-          if (result.action === 'created') results.summary.created++;
-          else if (result.action === 'updated') results.summary.updated++;
-          else if (result.action === 'skipped' && result.reason) {
+          if (result.action === 'created') {
+            results.summary.created++;
+            console.log('✅ Asistente creado exitosamente');
+          } else if (result.action === 'updated') {
+            results.summary.updated++;
+            console.log('✅ Asistente actualizado exitosamente');
+          } else if (result.action === 'skipped' && result.reason) {
             results.summary.skipped++;
             results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
+            console.log('⚠️ Asistente omitido:', result.reason);
           }
         } catch (error) {
           console.error('❌ Error procesando asistente:', error);
@@ -288,6 +301,16 @@ export async function POST(request: Request) {
           results.summary.errors++;
         }
       }
+
+      // Log final summary
+      console.log('\n📊 Resumen del procesamiento:', {
+        total: results.summary.total,
+        created: results.summary.created,
+        updated: results.summary.updated,
+        skipped: results.summary.skipped,
+        errors: results.summary.errors,
+        skippedReasons: results.summary.skippedReasons
+      });
     } else if (action === 'attendee.updated') {
       // For attendee updates, we need to get the attendee data
       // Extract attendee ID from URL - Format: https://www.eventbriteapi.com/v3/events/1287687180019/attendees/19674182663/
