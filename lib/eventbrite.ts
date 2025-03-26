@@ -47,7 +47,7 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
 
   // Obtener asistentes del primer evento
   const response1 = await fetch(
-    `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID_1}/attendees/`,
+    `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID_1}/attendees/?expand=profile,answers`,
     { headers }
   );
 
@@ -60,7 +60,7 @@ export async function getEventbriteAttendees(): Promise<EventbriteAttendee[]> {
 
   // Obtener asistentes del segundo evento
   const response2 = await fetch(
-    `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID_2}/attendees/`,
+    `https://www.eventbriteapi.com/v3/events/${process.env.EVENTBRITE_EVENT_ID_2}/attendees/?expand=profile,answers`,
     { headers }
   );
 

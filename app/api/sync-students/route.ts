@@ -42,14 +42,21 @@ export async function POST() {
           (answer) => answer.question_id === process.env.EVENTBRITE_DNI_QUESTION_ID
         );
 
-        if (!dniAnswer) {
+        if (!dniAnswer || !dniAnswer.answer) {
           console.error(`No se encontró DNI para el asistente ${attendee.profile.email}`);
           results.errors++;
           results.pending.push(attendee.profile.email);
           continue;
         }
 
-        const dni = dniAnswer.answer;
+        const dni = dniAnswer.answer.trim();
+
+        if (!dni) {
+          console.error(`DNI vacío para el asistente ${attendee.profile.email}`);
+          results.errors++;
+          results.pending.push(attendee.profile.email);
+          continue;
+        }
 
         // Verificar si el estudiante ya existe
         const existingUser = await usersCollection.findOne({ email: attendee.profile.email });
