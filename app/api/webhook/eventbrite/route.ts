@@ -294,7 +294,9 @@ export async function POST(request: Request) {
       const apiUrl = body.api_url;
       console.log('🔗 URL de la API:', apiUrl);
       
-      const orderId = apiUrl.split('/').pop();
+      // Extraer el ID de la orden usando una expresión regular más robusta
+      const orderIdMatch = apiUrl.match(/\/orders\/(\d+)/);
+      const orderId = orderIdMatch ? orderIdMatch[1] : null;
       console.log('📋 ID de la orden:', orderId);
 
       if (!orderId) {
@@ -344,8 +346,15 @@ export async function POST(request: Request) {
       console.log('👤 Procesando actualización de asistente...');
       
       // Extraer IDs del payload
-      const eventId = body.data.event_id;
-      const attendeeId = body.data.attendee_id;
+      const apiUrl = body.api_url;
+      console.log('🔗 URL de la API:', apiUrl);
+      
+      // Extraer event_id y attendee_id de la URL
+      const eventIdMatch = apiUrl.match(/\/events\/(\d+)/);
+      const attendeeIdMatch = apiUrl.match(/\/attendees\/(\d+)/);
+      
+      const eventId = eventIdMatch ? eventIdMatch[1] : null;
+      const attendeeId = attendeeIdMatch ? attendeeIdMatch[1] : null;
       
       console.log('📋 IDs extraídos:', { eventId, attendeeId });
 
