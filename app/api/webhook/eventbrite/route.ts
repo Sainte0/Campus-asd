@@ -231,6 +231,7 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
 export async function POST(request: Request) {
   try {
     console.log('\n🔔 Webhook recibido');
+    console.log('📝 Headers:', JSON.stringify(Object.fromEntries(request.headers.entries()), null, 2));
     
     // Verificar el método de la petición
     if (request.method !== 'POST') {
@@ -256,6 +257,8 @@ export async function POST(request: Request) {
 
     const action = body.config.action;
     console.log('🎯 Acción recibida:', action);
+    console.log('🔍 Tipo de acción:', typeof action);
+    console.log('📋 Acciones válidas:', validActions);
 
     // Verificar que la acción sea válida
     if (!validActions.includes(action)) {
@@ -285,9 +288,12 @@ export async function POST(request: Request) {
     // Procesar según el tipo de acción
     if (action === 'order.placed' || action === 'order.updated') {
       console.log('🛍️ Procesando orden...');
+      console.log('📦 Datos de la orden:', JSON.stringify(body, null, 2));
       
       // Extraer el ID de la orden de la URL de la API
       const apiUrl = body.api_url;
+      console.log('🔗 URL de la API:', apiUrl);
+      
       const orderId = apiUrl.split('/').pop();
       console.log('📋 ID de la orden:', orderId);
 
@@ -301,6 +307,7 @@ export async function POST(request: Request) {
 
       // Obtener detalles de la orden
       try {
+        console.log('🌐 Obteniendo detalles de la orden...');
         const orderResponse = await fetch(
           `https://www.eventbriteapi.com/v3/orders/${orderId}/`,
           {
@@ -312,7 +319,8 @@ export async function POST(request: Request) {
         );
 
         if (!orderResponse.ok) {
-          console.log('❌ Error al obtener detalles de la orden:', await orderResponse.text());
+          const errorText = await orderResponse.text();
+          console.log('❌ Error al obtener detalles de la orden:', errorText);
           return NextResponse.json(
             { error: 'Error al obtener detalles de la orden' },
             { status: 500 }
