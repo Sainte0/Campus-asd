@@ -3,6 +3,17 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
+import { Types } from 'mongoose';
+
+interface MongoUser {
+  _id: Types.ObjectId;
+  email: string;
+  name: string;
+  role: string;
+  documento: string;
+  eventId: string;
+  password: string;
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -25,7 +36,7 @@ export const authOptions: NextAuthOptions = {
             { email: credentials.email },
             { documento: credentials.password }
           ]
-        });
+        }) as MongoUser | null;
 
         if (!user) {
           throw new Error('Credenciales inválidas');
