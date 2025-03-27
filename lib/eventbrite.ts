@@ -16,6 +16,7 @@ export interface EventbriteAttendee {
   event_id: string;
   profile: EventbriteProfile;
   answers: EventbriteAnswer[];
+  ticket_class_name: string;
 }
 
 export interface EventbriteQuestion {

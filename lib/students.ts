@@ -7,6 +7,7 @@ interface StudentData {
   email: string;
   role: string;
   eventId: string;
+  commission?: string;
 }
 
 export async function createStudent(studentData: StudentData) {

@@ -8,6 +8,7 @@ export interface IUser extends Document {
   eventbriteId?: string;
   eventId: string;
   documento: string;
+  commission?: string;
   status?: 'registered' | 'checked_in' | 'checked_out';
   createdAt: Date;
   updatedAt: Date;
@@ -44,6 +45,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+  },
+  commission: {
+    type: String,
+    sparse: true,
   },
   status: {
     type: String,

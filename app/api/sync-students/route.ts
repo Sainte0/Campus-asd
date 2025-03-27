@@ -9,6 +9,7 @@ interface Student {
   createdAt?: Date;
   documento?: string;
   eventId?: string;
+  commission?: string;
 }
 
 interface MissingStudent {
@@ -128,19 +129,25 @@ export async function POST() {
 
         console.log('DNI encontrado:', dni);
 
+        // Obtener la comisión del asistente
+        const commission = attendee.ticket_class_name;
+        console.log('Comisión:', commission);
+
         const existingStudent = existingStudentsMap.get(attendee.profile.email);
 
         if (existingStudent) {
           console.log('Estudiante existente encontrado:', {
             email: existingStudent.email,
             documento: existingStudent.documento,
-            eventId: existingStudent.eventId
+            eventId: existingStudent.eventId,
+            commission: existingStudent.commission
           });
 
           // Verificar si necesitamos actualizar
           const needsUpdate = 
             existingStudent.documento !== dni || 
-            existingStudent.eventId !== attendee.event_id;
+            existingStudent.eventId !== attendee.event_id ||
+            existingStudent.commission !== commission;
 
           if (needsUpdate) {
             console.log('🔄 Actualizando estudiante existente:', existingStudent.email);
@@ -148,7 +155,8 @@ export async function POST() {
               dni,
               name: attendee.profile.name,
               email: attendee.profile.email,
-              eventId: attendee.event_id
+              eventId: attendee.event_id,
+              commission
             });
             console.log('Resultado de actualización:', updateResult);
             results.updated++;
@@ -166,7 +174,8 @@ export async function POST() {
             name: attendee.profile.name,
             email: attendee.profile.email,
             role: 'student',
-            eventId: attendee.event_id
+            eventId: attendee.event_id,
+            commission
           }) as Student;
 
           if (!student) {
@@ -181,7 +190,8 @@ export async function POST() {
             id: student._id,
             email: student.email,
             documento: student.documento,
-            eventId: student.eventId
+            eventId: student.eventId,
+            commission: student.commission
           });
 
           // Crear comisión para el estudiante
