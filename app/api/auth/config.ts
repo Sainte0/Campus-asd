@@ -12,7 +12,9 @@ interface MongoUser {
   role: string;
   documento: string;
   eventId: string;
-  password: string;
+  password?: string;
+  eventbriteId?: string;
+  status?: string;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -43,7 +45,15 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Verificar contraseña
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        let isValid = false;
+        
+        if (user.password) {
+          // Si tiene contraseña hasheada, la comparamos
+          isValid = await bcrypt.compare(credentials.password, user.password);
+        } else {
+          // Si no tiene contraseña hasheada, comparamos directamente con el documento
+          isValid = credentials.password === user.documento;
+        }
 
         if (!isValid) {
           throw new Error('Credenciales inválidas');
