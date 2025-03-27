@@ -13,6 +13,7 @@ interface Section {
   weekNumber: number;
   videoUrl: string;
   pdfUrl?: string;
+  eventId: string;
 }
 
 interface PaginationInfo {
@@ -29,6 +30,7 @@ export default function SectionsManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<string>('');
 
   // Estado para el formulario
   const [weekNumber, setWeekNumber] = useState('');
@@ -52,13 +54,15 @@ export default function SectionsManagement() {
     if (!session || session.user?.role !== 'admin') {
       router.push('/');
     } else {
-      fetchSections(currentPage);
+      if (selectedEvent) {
+        fetchSections(currentPage);
+      }
     }
-  }, [session, status, router, currentPage]);
+  }, [session, status, router, currentPage, selectedEvent]);
 
   const fetchSections = async (page: number = 1) => {
     try {
-      const response = await fetch(`/api/sections?page=${page}&limit=10`);
+      const response = await fetch(`/api/sections?page=${page}&limit=10&eventId=${selectedEvent}`);
       const data = await response.json();
       if (response.ok) {
         setSections(data.sections);
@@ -143,6 +147,11 @@ export default function SectionsManagement() {
     e.preventDefault();
     setError('');
 
+    if (!selectedEvent) {
+      setError('Por favor, seleccione un evento');
+      return;
+    }
+
     try {
       let fileUrl = pdfUrl;
       if (selectedFile) {
@@ -158,6 +167,7 @@ export default function SectionsManagement() {
         description,
         videoUrl,
         pdfUrl: fileUrl,
+        eventId: selectedEvent,
       };
 
       const response = await fetch('/api/sections', {
@@ -220,6 +230,7 @@ export default function SectionsManagement() {
         description,
         videoUrl,
         pdfUrl: fileUrl,
+        eventId: selectedEvent,
       };
 
       const response = await fetch(`/api/sections/${editingSection._id}`, {
@@ -390,6 +401,36 @@ export default function SectionsManagement() {
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Selector de Evento */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Seleccionar Evento</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => setSelectedEvent(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
+                className={`p-4 rounded-lg border ${
+                  selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300'
+                }`}
+              >
+                <h3 className="font-medium">Evento 1</h3>
+                <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
+              </button>
+              <button
+                onClick={() => setSelectedEvent(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
+                className={`p-4 rounded-lg border ${
+                  selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-blue-300'
+                }`}
+              >
+                <h3 className="font-medium">Evento 2</h3>
+                <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2}</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Formulario de Sección */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">
               {editingSection ? 'Editar Sección' : 'Crear Nueva Sección'}
@@ -398,6 +439,12 @@ export default function SectionsManagement() {
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
                 {error}
+              </div>
+            )}
+
+            {!selectedEvent && (
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+                Por favor, seleccione un evento para comenzar
               </div>
             )}
 

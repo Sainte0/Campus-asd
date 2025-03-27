@@ -15,16 +15,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
+    const eventId = searchParams.get('eventId');
     const skip = (page - 1) * limit;
 
     const { db } = await connectToDatabase();
     
+    // Construir el filtro basado en el eventId
+    const filter = eventId ? { eventId } : {};
+    
     // Obtener el total de documentos para la paginación
-    const total = await db.collection('sections').countDocuments();
+    const total = await db.collection('sections').countDocuments(filter);
     
     // Obtener las secciones con paginación y ordenadas por número de semana
     const sections = await db.collection('sections')
-      .find({})
+      .find(filter)
       .sort({ weekNumber: 1 })
       .skip(skip)
       .limit(limit)

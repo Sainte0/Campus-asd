@@ -11,6 +11,7 @@ interface Section {
   weekNumber: number;
   videoUrl: string;
   pdfUrl?: string;
+  eventId: string;
 }
 
 interface PaginationInfo {
@@ -30,28 +31,27 @@ export default function StudentDashboard() {
   const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/');
-    } else if (session?.user?.role !== 'student') {
+    if (status === 'loading') return;
+    
+    if (!session || session.user?.role !== 'student') {
       router.push('/');
     } else {
-      fetchSections(currentPage);
+      fetchSections();
     }
-  }, [session, status, router, currentPage]);
+  }, [session, status, router]);
 
-  const fetchSections = async (page: number = 1) => {
+  const fetchSections = async () => {
     try {
-      const response = await fetch(`/api/sections?page=${page}&limit=10`);
-      if (!response.ok) {
-        throw new Error('Error al obtener las secciones');
-      }
+      const response = await fetch('/api/sections/student');
       const data = await response.json();
-      setSections(data.sections);
-      setPaginationInfo(data.pagination);
+      if (response.ok) {
+        setSections(data.sections);
+      } else {
+        throw new Error(data.error || 'Error al cargar las secciones');
+      }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error al obtener secciones:', error);
       setError('Error al cargar las secciones');
-      setSections([]);
     } finally {
       setLoading(false);
     }
@@ -95,12 +95,12 @@ export default function StudentDashboard() {
     );
   };
 
-  if (status === 'loading' || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Cargando...</div>
-      </div>
-    );
+  if (status === 'loading') {
+    return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
+  }
+
+  if (!session || session.user?.role !== 'student') {
+    return null;
   }
 
   return (
@@ -126,73 +126,57 @@ export default function StudentDashboard() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-6">Mis Secciones</h1>
+          
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
 
-          <div className="space-y-6">
-            {sections && sections.length > 0 ? (
-              sections.map((section) => (
+          {loading ? (
+            <p>Cargando secciones...</p>
+          ) : sections.length === 0 ? (
+            <p>No hay secciones disponibles.</p>
+          ) : (
+            <div className="grid gap-6">
+              {sections.map((section) => (
                 <div
                   key={section._id}
-                  className="bg-white overflow-hidden shadow rounded-lg"
+                  className="bg-white overflow-hidden shadow-sm rounded-lg"
                 >
                   <div className="p-6">
-                    <h2 className="text-2xl font-bold mb-2">
+                    <h2 className="text-xl font-semibold mb-2">
                       Semana {section.weekNumber}: {section.title}
                     </h2>
                     <p className="text-gray-600 mb-4">{section.description}</p>
                     
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-medium mb-2">Video de la Clase</h3>
-                        <div className="aspect-w-16 aspect-h-9">
-                          <iframe
-                            src={section.videoUrl.replace('watch?v=', 'embed/')}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            className="w-full h-64 rounded-lg"
-                          ></iframe>
-                        </div>
-                      </div>
-
+                    <div className="space-x-4">
+                      <a
+                        href={section.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Ver Video
+                      </a>
                       {section.pdfUrl && (
-                        <div>
-                          <h3 className="text-lg font-medium mb-2">Material de Apoyo</h3>
-                          <div className="space-x-2">
-                            <a
-                              href={section.pdfUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                            >
-                              Ver PDF
-                            </a>
-                            <a
-                              href={`${section.pdfUrl}?download=true`}
-                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                              download
-                            >
-                              Descargar PDF
-                            </a>
-                          </div>
-                        </div>
+                        <a
+                          href={section.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          Ver PDF
+                        </a>
                       )}
                     </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-12 bg-white rounded-lg shadow">
-                <p className="text-gray-500">
-                  Aún no hay contenido disponible.
-                </p>
-              </div>
-            )}
-            {renderPagination()}
-          </div>
+              ))}
+            </div>
+          )}
+          {renderPagination()}
         </div>
       </main>
     </div>
