@@ -230,225 +230,203 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
 
 export async function POST(request: Request) {
   try {
-    console.log('\n📥 Webhook recibido de Eventbrite');
-    const data = await request.json() as EventbriteWebhookPayload;
+    console.log('\n🔔 Webhook recibido');
     
-    // Get action from config
-    const action = data.config.action;
-    console.log('📋 Acción recibida:', action);
-    console.log('📝 Datos completos:', JSON.stringify(data, null, 2));
+    // Verificar el método de la petición
+    if (request.method !== 'POST') {
+      console.log('❌ Método no permitido:', request.method);
+      return NextResponse.json(
+        { error: 'Método no permitido' },
+        { status: 405 }
+      );
+    }
 
-    // Verificar que sea una acción válida
+    // Obtener el cuerpo de la petición
+    const body = await request.json();
+    console.log('📦 Payload recibido:', JSON.stringify(body, null, 2));
+
+    // Verificar que el payload tenga la estructura esperada
+    if (!body || !body.config || !body.config.action) {
+      console.log('❌ Payload inválido:', body);
+      return NextResponse.json(
+        { error: 'Payload inválido' },
+        { status: 400 }
+      );
+    }
+
+    const action = body.config.action;
+    console.log('🎯 Acción recibida:', action);
+
+    // Verificar que la acción sea válida
     if (!validActions.includes(action)) {
-      console.log('⏭️ Acción ignorada:', action);
-      return NextResponse.json({ status: 'ignored', action });
+      console.log('❌ Acción no válida:', action);
+      return NextResponse.json(
+        { error: 'Acción no válida' },
+        { status: 400 }
+      );
     }
 
-    // Manejar webhook de prueba
+    // Manejar el webhook de prueba
     if (action === 'test') {
-      console.log('✅ Webhook de prueba recibido correctamente');
+      console.log('✅ Webhook de prueba procesado correctamente');
       return NextResponse.json({ 
-        status: 'success',
         message: 'Webhook de prueba procesado correctamente',
-        config: data.config
+        received: body
       });
     }
 
-    // Connect to MongoDB
-    console.log('🔄 Conectando a MongoDB...');
-    await connectDB();
-    console.log('✅ Conexión establecida');
+    // Conectar a la base de datos
+    const db = await connectDB();
+    console.log('✅ Conexión a la base de datos establecida');
 
-    const results = {
-      status: 'success',
-      action,
-      processed: [] as ProcessResult[],
-      eventId: null as string | null,
-      summary: {
-        total: 0,
-        created: 0,
-        updated: 0,
-        skipped: 0,
-        errors: 0,
-        skippedReasons: {} as Record<string, number>
-      }
-    };
+    let attendees: any[] = [];
+    let orderDetails: any = null;
 
+    // Procesar según el tipo de acción
     if (action === 'order.placed' || action === 'order.updated') {
-      // Extract order ID from URL
-      const orderId = data.api_url.split('/orders/')[1]?.replace('/', '');
-      console.log('🔍 URL de la orden:', data.api_url);
-      console.log('🔑 Order ID extraído:', orderId);
+      console.log('🛍️ Procesando orden...');
       
+      // Extraer el ID de la orden de la URL de la API
+      const apiUrl = body.api_url;
+      const orderId = apiUrl.split('/').pop();
+      console.log('📋 ID de la orden:', orderId);
+
       if (!orderId) {
-        throw new Error('No se pudo obtener el ID de la orden');
+        console.log('❌ No se encontró ID de orden en la URL:', apiUrl);
+        return NextResponse.json(
+          { error: 'ID de orden no encontrado' },
+          { status: 400 }
+        );
       }
 
-      console.log('🎫 Procesando orden:', orderId);
-
-      // Get order details first
-      const orderUrl = `https://www.eventbriteapi.com/v3/orders/${orderId}/?expand=event`;
-      console.log('🌐 Obteniendo detalles de la orden:', orderUrl);
-
-      const orderResponse = await fetch(orderUrl, {
-        headers: {
-          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!orderResponse.ok) {
-        const errorText = await orderResponse.text();
-        console.error('❌ Error obteniendo detalles de la orden. Status:', orderResponse.status);
-        console.error('📝 Error detallado:', errorText);
-        throw new Error(`Error obteniendo detalles de la orden: ${orderResponse.status} - ${errorText}`);
-      }
-
-      const orderData = await orderResponse.json();
-      console.log('✅ Detalles de la orden recibidos:', {
-        orderId: orderData.id,
-        eventId: orderData.event_id,
-        status: orderData.status,
-        total: orderData.total
-      });
-
-      // Get and process all attendees in the order
-      const attendees = await getOrderAttendees(orderId);
-      console.log(`📋 Procesando ${attendees.length} asistentes`);
-
-      // Log event distribution
-      const eventDistribution = attendees.reduce((acc: any, attendee: any) => {
-        const eventId = attendee.event_id;
-        acc[eventId] = (acc[eventId] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('📊 Distribución de asistentes por evento:', eventDistribution);
-
-      results.summary.total = attendees.length;
-
-      // Procesar cada asistente
-      for (const attendee of attendees) {
-        try {
-          console.log('\n🔄 Procesando asistente:', {
-            email: attendee.profile?.email,
-            name: `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim(),
-            eventId: attendee.event_id,
-            answers: attendee.answers
-          });
-
-          const result = await processAttendee(attendee);
-          results.processed.push(result);
-          results.eventId = attendee.event_id;
-
-          // Update summary
-          if (result.action === 'created') {
-            results.summary.created++;
-            console.log('✅ Asistente creado exitosamente');
-          } else if (result.action === 'updated') {
-            results.summary.updated++;
-            console.log('✅ Asistente actualizado exitosamente');
-          } else if (result.action === 'skipped' && result.reason) {
-            results.summary.skipped++;
-            results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
-            console.log('⚠️ Asistente omitido:', result.reason);
+      // Obtener detalles de la orden
+      try {
+        const orderResponse = await fetch(
+          `https://www.eventbriteapi.com/v3/orders/${orderId}/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
           }
-        } catch (error) {
-          console.error('❌ Error procesando asistente:', error);
-          results.processed.push({ 
-            action: 'error', 
-            email: attendee.profile?.email || 'unknown',
-            eventId: attendee.event_id || 'unknown',
-            error: error instanceof Error ? error.message : 'Error desconocido'
-          });
-          results.summary.errors++;
-        }
-      }
+        );
 
-      // Log final summary
-      console.log('\n📊 Resumen del procesamiento:', {
-        total: results.summary.total,
-        created: results.summary.created,
-        updated: results.summary.updated,
-        skipped: results.summary.skipped,
-        errors: results.summary.errors,
-        skippedReasons: results.summary.skippedReasons
-      });
+        if (!orderResponse.ok) {
+          console.log('❌ Error al obtener detalles de la orden:', await orderResponse.text());
+          return NextResponse.json(
+            { error: 'Error al obtener detalles de la orden' },
+            { status: 500 }
+          );
+        }
+
+        orderDetails = await orderResponse.json();
+        console.log('📋 Detalles de la orden:', JSON.stringify(orderDetails, null, 2));
+
+        // Obtener asistentes de la orden
+        attendees = await getOrderAttendees(orderId);
+        console.log('👥 Asistentes encontrados:', attendees.length);
+      } catch (error) {
+        console.error('❌ Error al obtener detalles de la orden:', error);
+        return NextResponse.json(
+          { error: 'Error al obtener detalles de la orden' },
+          { status: 500 }
+        );
+      }
     } else if (action === 'attendee.updated') {
-      // For attendee updates, we need to get the attendee data
-      const eventId = data.event_id;
-      const attendeeId = data.attendee_id;
+      console.log('👤 Procesando actualización de asistente...');
       
-      console.log('🔍 Procesando actualización de asistente:', {
-        eventId,
-        attendeeId
-      });
+      // Extraer IDs del payload
+      const eventId = body.data.event_id;
+      const attendeeId = body.data.attendee_id;
+      
+      console.log('📋 IDs extraídos:', { eventId, attendeeId });
 
       if (!eventId || !attendeeId) {
-        throw new Error('No se pudo obtener el ID del evento o del asistente');
+        console.log('❌ Faltan IDs requeridos:', { eventId, attendeeId });
+        return NextResponse.json(
+          { error: 'Faltan IDs requeridos' },
+          { status: 400 }
+        );
       }
 
-      // Get attendee data
-      const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/${attendeeId}/?expand=profile,answers`;
-      console.log('🌐 URL de la petición:', url);
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error obteniendo datos del asistente. Status:', response.status);
-        console.error('📝 Error detallado:', errorText);
-        throw new Error(`Error obteniendo datos del asistente: ${response.status} - ${errorText}`);
-      }
-
-      const attendeeData = await response.json();
-      console.log('✅ Datos del asistente recibidos:', {
-        email: attendeeData.profile?.email,
-        name: `${attendeeData.profile?.first_name} ${attendeeData.profile?.last_name}`.trim()
-      });
-
+      // Obtener detalles del asistente
       try {
-        const result = await processAttendee(attendeeData);
-        results.processed.push(result);
-        results.eventId = eventId;
+        const attendeeResponse = await fetch(
+          `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/${attendeeId}/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.EVENTBRITE_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-        // Update summary
-        if (result.action === 'created') {
-          results.summary.created++;
-          console.log('✅ Asistente creado exitosamente');
-        } else if (result.action === 'updated') {
-          results.summary.updated++;
-          console.log('✅ Asistente actualizado exitosamente');
-        } else if (result.action === 'skipped' && result.reason) {
-          results.summary.skipped++;
-          results.summary.skippedReasons[result.reason] = (results.summary.skippedReasons[result.reason] || 0) + 1;
-          console.log('⚠️ Asistente omitido:', result.reason);
+        if (!attendeeResponse.ok) {
+          console.log('❌ Error al obtener detalles del asistente:', await attendeeResponse.text());
+          return NextResponse.json(
+            { error: 'Error al obtener detalles del asistente' },
+            { status: 500 }
+          );
         }
+
+        const attendeeData = await attendeeResponse.json();
+        console.log('📋 Detalles del asistente:', JSON.stringify(attendeeData, null, 2));
+        attendees = [attendeeData];
       } catch (error) {
-        console.error('❌ Error procesando asistente:', error);
-        results.processed.push({ 
-          action: 'error',
-          email: attendeeData.profile?.email || 'unknown',
-          eventId: eventId,
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        });
-        results.summary.errors++;
+        console.error('❌ Error al obtener detalles del asistente:', error);
+        return NextResponse.json(
+          { error: 'Error al obtener detalles del asistente' },
+          { status: 500 }
+        );
       }
     }
 
-    console.log('✅ Procesamiento completado:', results);
-    return NextResponse.json(results);
+    // Procesar cada asistente
+    const results: ProcessResult[] = [];
+    for (const attendee of attendees) {
+      try {
+        const result = await processAttendee(attendee);
+        results.push(result);
+        console.log('✅ Asistente procesado:', result);
+      } catch (error) {
+        console.error('❌ Error procesando asistente:', error);
+        results.push({
+          action: 'error',
+          email: attendee.profile?.email || 'unknown',
+          eventId: attendee.event_id,
+          error: error instanceof Error ? error.message : 'Error desconocido'
+        });
+      }
+    }
+
+    // Resumir resultados
+    const summary = {
+      total: results.length,
+      created: results.filter(r => r.action === 'created').length,
+      updated: results.filter(r => r.action === 'updated').length,
+      skipped: results.filter(r => r.action === 'skipped').length,
+      errors: results.filter(r => r.action === 'error').length,
+      skippedReasons: results
+        .filter(r => r.action === 'skipped')
+        .reduce((acc: Record<string, number>, r) => {
+          acc[r.reason || 'unknown'] = (acc[r.reason || 'unknown'] || 0) + 1;
+          return acc;
+        }, {})
+    };
+
+    console.log('\n📊 Resumen de procesamiento:', JSON.stringify(summary, null, 2));
+
+    return NextResponse.json({
+      message: 'Webhook procesado correctamente',
+      summary
+    });
 
   } catch (error) {
-    console.error('❌ Error procesando webhook:', error);
-    return NextResponse.json({ 
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error desconocido'
-    }, { status: 500 });
+    console.error('❌ Error general:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }
 
