@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { options } from '../../auth/[...nextauth]/options';
+import { authOptions } from '../../auth/config';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -17,7 +17,7 @@ export async function GET(
   try {
     console.log('📥 Iniciando proceso de archivo...');
     
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     
     if (!session?.user) {
       console.log('❌ Acceso no autorizado');

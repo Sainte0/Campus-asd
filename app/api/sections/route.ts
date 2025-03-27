@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import Section from '@/models/Section';
-import { options } from '../auth/[...nextauth]/options';
+import { authOptions } from '../auth/config';
 
 // GET /api/sections - Obtener todas las secciones
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 // POST /api/sections - Crear una nueva sección
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     
     // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {

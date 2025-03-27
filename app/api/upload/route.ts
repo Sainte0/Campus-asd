@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { authOptions } from '../auth/config';
 import { getServerSession } from 'next-auth';
-import { options } from '../auth/[...nextauth]/options';
 import { connectToDatabase } from '@/lib/mongodb';
 
 // Nueva configuración de la ruta usando la sintaxis de Next.js 14
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     console.log('📥 Iniciando proceso de subida de archivo...');
     
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     
     if (!session?.user || session.user.role !== 'admin') {
       console.log('❌ Acceso no autorizado');

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
-import { options } from '../../auth/[...nextauth]/options';
+import { authOptions } from '../../auth/config';
 import { ObjectId } from 'mongodb';
 
 // PUT /api/sections/[id] - Actualizar una sección
@@ -10,7 +10,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     
     // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {
@@ -59,7 +59,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
     
     // Verificar si el usuario está autenticado y es administrador
     if (!session?.user || session.user.role !== 'admin') {

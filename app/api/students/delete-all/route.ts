@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
+import { authOptions } from '../../auth/config';
 import { getServerSession } from 'next-auth';
-import { options } from '../../auth/[...nextauth]/options';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 
 export async function DELETE() {
   try {
-    const session = await getServerSession(options);
+    const session = await getServerSession(authOptions);
 
     if (!session || session.user?.role !== 'admin') {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
