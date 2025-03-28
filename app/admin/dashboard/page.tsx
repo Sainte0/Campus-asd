@@ -50,8 +50,7 @@ export default function AdminDashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId: selectedEvent,
-          page: currentPage
+          eventId: selectedEvent
         })
       });
 
@@ -63,15 +62,7 @@ export default function AdminDashboard() {
       const data = await response.json();
       setSyncResult(data.results);
 
-      if (data.status === 'partial') {
-        setHasMore(true);
-        setCurrentPage(data.nextPage);
-        toast.success(`Página ${currentPage} completada. Hay más páginas pendientes.`, {
-          duration: 5000
-        });
-      } else if (data.status === 'success') {
-        setHasMore(false);
-        setCurrentPage(1);
+      if (data.status === 'success') {
         toast.success('Sincronización completada exitosamente');
       }
     } catch (error) {
@@ -228,7 +219,7 @@ export default function AdminDashboard() {
                       : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                   }`}
                 >
-                  {syncing ? 'Sincronizando...' : hasMore ? `Sincronizar Página ${currentPage}` : 'Sincronizar Ahora'}
+                  {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
                 </button>
                 
                 {syncResult && (
@@ -238,11 +229,6 @@ export default function AdminDashboard() {
                     <p>Estudiantes creados/actualizados: {syncResult.processed}</p>
                     <p>Omitidos: {syncResult.skipped}</p>
                     <p>Errores: {syncResult.errors}</p>
-                    {hasMore && (
-                      <p className="mt-2 text-blue-600">
-                        Hay más páginas pendientes. Haga clic en "Sincronizar" nuevamente para continuar.
-                      </p>
-                    )}
                   </div>
                 )}
                 

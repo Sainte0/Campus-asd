@@ -170,6 +170,7 @@ export async function POST(request: Request) {
       details: [] as any[]
     };
 
+    // Procesar todas las páginas
     while (hasMore) {
       console.log(`\n📄 Procesando página ${page}...`);
       
@@ -187,15 +188,9 @@ export async function POST(request: Request) {
       hasMore = pagination.has_more;
       page++;
 
-      // Si hay más páginas, devolver resultados parciales
+      // Pequeña pausa entre páginas para evitar rate limiting
       if (hasMore) {
-        console.log(`✅ Página ${page-1} completada. Hay más páginas pendientes.`);
-        return NextResponse.json({
-          status: 'partial',
-          results: batchResults,
-          message: 'Sincronización en progreso. Por favor, intente nuevamente para completar.',
-          nextPage: page
-        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
