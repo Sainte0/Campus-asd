@@ -84,12 +84,20 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
         let documento = null;
         let commission = null;
         if (attendee.answers && Array.isArray(attendee.answers)) {
-          console.log(`🔍 Procesando respuestas para ${email}:`, attendee.answers);
+          console.log(`\n🔍 Procesando respuestas para ${email}:`);
+          console.log('📋 Todas las preguntas disponibles:', attendee.answers.map(a => ({
+            question_id: a.question_id,
+            question: a.question,
+            answer: a.answer
+          })));
+          
           for (const answer of attendee.answers) {
-            console.log(`📝 Respuesta:`, {
+            console.log(`\n📝 Analizando respuesta:`, {
               question_id: answer.question_id,
+              question: answer.question,
               answer: answer.answer,
-              question: answer.question
+              expected_dni_id: DNI_QUESTION_IDS[eventId],
+              expected_commission_id: COMMISSION_QUESTION_IDS[eventId]
             });
             
             // Usar el ID de pregunta específico para el evento
