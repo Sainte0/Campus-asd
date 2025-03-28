@@ -3,16 +3,36 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 
+// Interfaces para las respuestas de Eventbrite
+interface EventbriteAnswer {
+  question_id: string;
+  question: string;
+  answer: string;
+  type: string;
+}
+
+interface EventbriteProfile {
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface EventbriteAttendee {
+  id: string;
+  profile: EventbriteProfile;
+  answers: EventbriteAnswer[];
+}
+
 // IDs de las preguntas para cada evento
 const DNI_QUESTION_IDS: Record<string, string> = {
-  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: '287305383',
-  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: '287346273'
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: process.env.EVENTBRITE_DNI_QUESTION_ID || '',
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: process.env.EVENTBRITE_DNI_QUESTION_ID_2 || ''
 };
 
 // IDs de las preguntas de comisión para cada evento
 const COMMISSION_QUESTION_IDS: Record<string, string> = {
-  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: '287305384',
-  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: '287346274'
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: process.env.EVENTBRITE_COMMISSION_QUESTION_ID || '',
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: process.env.EVENTBRITE_COMMISSION_QUESTION_ID_2 || ''
 };
 
 async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
@@ -54,7 +74,7 @@ async function getEventAttendees(eventId: string, page: number = 1, pageSize: nu
   }
 }
 
-async function processAttendeesBatch(attendees: any[], eventId: string) {
+async function processAttendeesBatch(attendees: EventbriteAttendee[], eventId: string) {
   const results = {
     processed: 0,
     skipped: 0,
@@ -85,11 +105,22 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
         let commission = null;
         if (attendee.answers && Array.isArray(attendee.answers)) {
           console.log(`\n🔍 Procesando respuestas para ${email}:`);
-          console.log('📋 Todas las preguntas disponibles:', attendee.answers.map(a => ({
+          console.log('📋 Todas las preguntas disponibles:', attendee.answers.map((a: EventbriteAnswer) => ({
             question_id: a.question_id,
             question: a.question,
-            answer: a.answer
+            answer: a.answer,
+            type: a.type
           })));
+          
+          // Buscar preguntas que contengan la palabra "comisión" o "commission"
+          const possibleCommissionQuestions = attendee.answers.filter(a => 
+            a.question.toLowerCase().includes('comisión') || 
+            a.question.toLowerCase().includes('commission')
+          );
+          
+          if (possibleCommissionQuestions.length > 0) {
+            console.log('🎯 Posibles preguntas de comisión encontradas:', possibleCommissionQuestions);
+          }
           
           for (const answer of attendee.answers) {
             console.log(`\n📝 Analizando respuesta:`, {
