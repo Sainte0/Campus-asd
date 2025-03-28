@@ -21,8 +21,10 @@ function getInstructorFromCommission(commission: string): 'marion' | 'david' {
   // Comisiones de Marion
   if (commissionLower.includes('comisión 11 presencial') || 
       commissionLower.includes('comisión 11 streaming') ||
-      commissionLower.includes('comisión 12 presencial') ||
+      commissionLower.includes('comisión 12 presencial') || 
       commissionLower.includes('comisión 12 streaming') ||
+      commissionLower.includes('sábado online - 05/04/2025 9 a 13hs marion') ||
+      commissionLower.includes('sabado online - 05/04/2025 9 a 13hs marion') ||
       commissionLower.includes('sábado online')) {
     return 'marion';
   }
@@ -45,7 +47,19 @@ export async function GET() {
       email: session.user.email
     });
 
-    if (!student || !student.eventId) {
+    if (!student) {
+      return NextResponse.json(
+        { error: 'No se encontró el estudiante' },
+        { status: 404 }
+      );
+    }
+
+    // Si la comisión es "Modalidad Libre con Acceso a Contenidos", usar el Evento 2
+    const eventId = student.commission?.toLowerCase().includes('modalidad libre con acceso a contenidos')
+      ? process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
+      : student.eventId;
+
+    if (!eventId) {
       return NextResponse.json(
         { error: 'No se encontró el evento asignado al estudiante' },
         { status: 404 }
@@ -58,7 +72,7 @@ export async function GET() {
     // Obtener las secciones del evento del estudiante filtradas por instructor
     const sections = await db.collection('sections')
       .find({ 
-        eventId: student.eventId,
+        eventId: eventId,
         instructor: instructor
       })
       .sort({ weekNumber: 1 })
