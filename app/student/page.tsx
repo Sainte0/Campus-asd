@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { Header } from '../components/Header';
 
 interface Section {
   _id: string;
@@ -104,29 +105,12 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold">Campus Virtual - Estudiante</h1>
-            </div>
-            <div className="flex items-center">
-              <span className="text-gray-700 mr-4">{session?.user?.name}</span>
-              <button
-                onClick={() => router.push('/api/auth/signout')}
-                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background-light">
+      <Header />
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-6">Mis Secciones</h1>
+          <h1 className="page-title">Mis Secciones</h1>
           
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -143,10 +127,10 @@ export default function StudentDashboard() {
               {sections.map((section) => (
                 <div
                   key={section._id}
-                  className="bg-white overflow-hidden shadow-sm rounded-lg"
+                  className="card"
                 >
                   <div className="p-6">
-                    <h2 className="text-xl font-semibold mb-2">
+                    <h2 className="section-title">
                       Semana {section.weekNumber}: {section.title}
                     </h2>
                     <p className="text-gray-600 mb-4">{section.description}</p>
@@ -156,7 +140,7 @@ export default function StudentDashboard() {
                         href={section.videoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="btn-primary"
                       >
                         Ver Video
                       </a>
@@ -165,7 +149,7 @@ export default function StudentDashboard() {
                           href={section.pdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          className="btn-primary bg-green-600 hover:bg-green-700"
                         >
                           Ver PDF
                         </a>
