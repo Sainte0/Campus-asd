@@ -1,12 +1,19 @@
 'use client';
 
 import Image from 'next/image';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 export function Header() {
   const { data: session } = useSession();
   const router = useRouter();
+
+  const handleSignOut = async () => {
+    await signOut({ 
+      redirect: true,
+      callbackUrl: '/api/auth/signout'
+    });
+  };
 
   return (
     <header>
@@ -79,7 +86,7 @@ export function Header() {
                 <span className="text-gray-700">{session?.user?.name}</span>
               </div>
               <button
-                onClick={() => router.push('/api/auth/signout')}
+                onClick={handleSignOut}
                 className="btn-primary bg-red-500 hover:bg-red-600"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
