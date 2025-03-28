@@ -16,7 +16,6 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
-  const [selectedSubEvent, setSelectedSubEvent] = useState<'david' | 'marion' | null>(null);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -28,21 +27,11 @@ export default function AdminDashboard() {
 
   const handleEventSelect = (eventId: string) => {
     setSelectedEvent(eventId);
-    setSelectedSubEvent(null); // Reset sub-event selection when changing events
-  };
-
-  const handleSubEventSelect = (subEvent: 'david' | 'marion') => {
-    setSelectedSubEvent(subEvent);
   };
 
   const handleSync = async () => {
     if (!selectedEvent) {
       toast.error('Por favor, seleccione un evento primero');
-      return;
-    }
-
-    if (selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && !selectedSubEvent) {
-      toast.error('Por favor, seleccione el instructor (David o Marion) para el Evento 1');
       return;
     }
 
@@ -204,44 +193,17 @@ export default function AdminDashboard() {
                 <div className="mb-4">
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Seleccionar Evento</h3>
                   <div className="space-y-2">
-                    <div>
-                      <button
-                        onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
-                        className={`w-full p-3 rounded-lg border ${
-                          selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
-                        <h4 className="font-medium">Evento 1</h4>
-                        <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
-                      </button>
-                      
-                      {selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && (
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => handleSubEventSelect('david')}
-                            className={`p-2 rounded-lg border ${
-                              selectedSubEvent === 'david'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-blue-300'
-                            }`}
-                          >
-                            <h5 className="font-medium">David</h5>
-                          </button>
-                          <button
-                            onClick={() => handleSubEventSelect('marion')}
-                            className={`p-2 rounded-lg border ${
-                              selectedSubEvent === 'marion'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-blue-300'
-                            }`}
-                          >
-                            <h5 className="font-medium">Marion</h5>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
+                      className={`w-full p-3 rounded-lg border ${
+                        selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <h4 className="font-medium">Evento 1</h4>
+                      <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
+                    </button>
 
                     <button
                       onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
@@ -259,9 +221,9 @@ export default function AdminDashboard() {
 
                 <button
                   onClick={handleSync}
-                  disabled={syncing || !selectedEvent || (selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && !selectedSubEvent)}
+                  disabled={syncing || !selectedEvent}
                   className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                    syncing || !selectedEvent || (selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && !selectedSubEvent)
+                    syncing || !selectedEvent
                       ? 'bg-blue-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                   }`}

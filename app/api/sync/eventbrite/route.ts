@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 
-async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 25) {
+async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
   const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers&page_size=${pageSize}&page=${page}`;
   
   try {
@@ -45,7 +45,7 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
   };
 
   // Procesar en paralelo con un límite de concurrencia
-  const batchSize = 5;
+  const batchSize = 10;
   for (let i = 0; i < attendees.length; i += batchSize) {
     const batch = attendees.slice(i, i + batchSize);
     const promises = batch.map(async (attendee) => {
