@@ -228,6 +228,29 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
   }
 }
 
+async function fetchAttendeeData(apiUrl: string) {
+  try {
+    console.log('🔄 Intentando obtener datos de:', apiUrl);
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${process.env.EVENTBRITE_PRIVATE_TOKEN}`,
+      }
+    });
+
+    if (!response.ok) {
+      console.error('❌ Error en respuesta de Eventbrite:', response.status);
+      throw new Error(`Error en API de Eventbrite: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Datos obtenidos correctamente');
+    return data.attendees || [data];
+  } catch (error) {
+    console.error('❌ Error obteniendo datos de Eventbrite:', error);
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     console.log('\n🔔 Webhook recibido');
