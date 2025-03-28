@@ -1,18 +1,15 @@
 'use client';
 
 import Image from 'next/image';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 export function Header() {
   const { data: session } = useSession();
   const router = useRouter();
 
-  const handleSignOut = async () => {
-    await signOut({ 
-      redirect: true,
-      callbackUrl: '/api/auth/signout'
-    });
+  const handleSignOut = () => {
+    router.push('/signout');
   };
 
   return (
