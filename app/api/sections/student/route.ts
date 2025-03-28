@@ -55,7 +55,8 @@ export async function GET() {
     }
 
     // Si la comisión es "Modalidad Libre con Acceso a Contenidos", usar el Evento 2
-    const eventId = student.commission?.toLowerCase().includes('modalidad libre con acceso a contenidos')
+    const isEvent2 = student.commission?.toLowerCase().includes('modalidad libre con acceso a contenidos');
+    const eventId = isEvent2
       ? process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
       : student.eventId;
 
@@ -69,12 +70,17 @@ export async function GET() {
     // Determinar el instructor basado en la comisión del estudiante
     const instructor = getInstructorFromCommission(student.commission || '');
 
-    // Obtener las secciones del evento del estudiante filtradas por instructor
+    // Construir el filtro de búsqueda
+    const filter: any = { eventId };
+
+    // Solo filtrar por instructor si no es el Evento 2
+    if (!isEvent2) {
+      filter.instructor = instructor;
+    }
+
+    // Obtener las secciones del evento del estudiante
     const sections = await db.collection('sections')
-      .find({ 
-        eventId: eventId,
-        instructor: instructor
-      })
+      .find(filter)
       .sort({ weekNumber: 1 })
       .toArray();
 
