@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
+import PendingStudentRequests from '@/app/components/PendingStudentRequests';
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
@@ -260,6 +261,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+
+          <div className="mt-6">
+            <PendingStudentRequests />
+            </div>  
         </div>
       </main>
     </div>
