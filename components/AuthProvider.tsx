@@ -15,6 +15,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Si no hay sesión
     if (!session) {
+      // Permitir acceso a la página de login de admin
+      if (pathname === '/admin/login') {
+        return;
+      }
       // Solo redirigir al inicio si no estamos ya en la página principal
       if (pathname !== '/') {
         router.replace('/');

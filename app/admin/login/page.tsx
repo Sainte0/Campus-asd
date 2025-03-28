@@ -36,7 +36,6 @@ export default function AdminLoginPage() {
           router.push('/admin/dashboard');
         } else {
           setError('No tienes permisos de administrador');
-          signIn('credentials', { callbackUrl: '/' });
         }
       }
     } catch (error) {
