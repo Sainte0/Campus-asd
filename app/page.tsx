@@ -9,7 +9,7 @@ import StudentRegistrationForm from './components/StudentRegistrationForm';
 export default function StudentLoginPage() {
   const { data: session, status } = useSession();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [documento, setDocumento] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
@@ -23,7 +23,7 @@ export default function StudentLoginPage() {
     try {
       const result = await signIn('credentials', {
         email,
-        password,
+        password: documento, // Usamos el documento como contraseña
         redirect: false,
       });
 
@@ -38,7 +38,6 @@ export default function StudentLoginPage() {
           router.push('/student');
         } else {
           setError('No tienes permisos de estudiante');
-          signIn('credentials', { callbackUrl: '/admin/login' });
         }
       }
     } catch (error) {
@@ -46,10 +45,6 @@ export default function StudentLoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAdminRedirect = () => {
-    router.push('/admin/login');
   };
 
   return (
@@ -112,18 +107,18 @@ export default function StudentLoginPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Contraseña o Documento
+                <label htmlFor="documento" className="block text-sm font-medium text-gray-700">
+                  Documento
                 </label>
                 <div className="mt-1">
                   <input
-                    id="password"
-                    type="password"
+                    id="documento"
+                    type="text"
                     required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={documento}
+                    onChange={(e) => setDocumento(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                    placeholder="••••••••"
+                    placeholder="Ingresa tu documento"
                   />
                 </div>
               </div>
@@ -162,22 +157,6 @@ export default function StudentLoginPage() {
                     className="px-2 bg-white text-primary hover:text-accent cursor-pointer"
                   >
                     ¿No puedes ingresar? Haz click aquí
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <button
-                    onClick={handleAdminRedirect}
-                    className="px-2 bg-white text-primary hover:text-accent cursor-pointer"
-                  >
-                    ¿Eres administrador? Ingresa aquí
                   </button>
                 </div>
               </div>
