@@ -187,8 +187,8 @@ export default function SectionsManagement() {
         videoUrl,
         pdfUrl: fileUrl,
         eventId: selectedEvent,
-        instructor,
-        commissionGroup,
+        instructor: selectedSubEvent || 'marion',
+        commissionGroup: selectedSubEvent || 'marion',
       };
 
       const response = await fetch('/api/sections', {
@@ -210,8 +210,6 @@ export default function SectionsManagement() {
       setDescription('');
       setVideoUrl('');
       setPdfUrl('');
-      setInstructor('marion');
-      setCommissionGroup('marion');
       setSelectedFile(null);
       if (e.target instanceof HTMLFormElement) {
         e.target.reset();
@@ -232,8 +230,6 @@ export default function SectionsManagement() {
     setDescription(section.description);
     setVideoUrl(section.videoUrl);
     setPdfUrl(section.pdfUrl || '');
-    setInstructor(section.instructor);
-    setCommissionGroup(section.commissionGroup);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -256,8 +252,8 @@ export default function SectionsManagement() {
         videoUrl,
         pdfUrl: fileUrl,
         eventId: selectedEvent,
-        instructor,
-        commissionGroup,
+        instructor: selectedSubEvent || 'marion',
+        commissionGroup: selectedSubEvent || 'marion',
       };
 
       const response = await fetch(`/api/sections/${editingSection._id}`, {
@@ -280,8 +276,6 @@ export default function SectionsManagement() {
       setDescription('');
       setVideoUrl('');
       setPdfUrl('');
-      setInstructor('marion');
-      setCommissionGroup('marion');
       setSelectedFile(null);
       if (e.target instanceof HTMLFormElement) {
         e.target.reset();
@@ -630,36 +624,6 @@ export default function SectionsManagement() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Instructor
-                </label>
-                <select
-                  value={instructor}
-                  onChange={(e) => setInstructor(e.target.value as 'marion' | 'david')}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  <option value="marion">Marion</option>
-                  <option value="david">David</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Grupo de Comisión
-                </label>
-                <select
-                  value={commissionGroup}
-                  onChange={(e) => setCommissionGroup(e.target.value as 'marion' | 'david')}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  <option value="marion">Marion</option>
-                  <option value="david">David</option>
-                </select>
-              </div>
-
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -687,8 +651,6 @@ export default function SectionsManagement() {
                       setDescription('');
                       setVideoUrl('');
                       setPdfUrl('');
-                      setInstructor('marion');
-                      setCommissionGroup('marion');
                       setSelectedFile(null);
                     }}
                     className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"

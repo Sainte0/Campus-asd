@@ -3,6 +3,34 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/config';
 
+// Función auxiliar para determinar el instructor basado en la comisión
+function getInstructorFromCommission(commission: string): 'marion' | 'david' {
+  // Convertir a minúsculas para hacer la comparación insensible a mayúsculas
+  const commissionLower = commission.toLowerCase();
+  
+  // Comisiones de David
+  if (commissionLower.includes('comisión 1 presencial') || 
+      commissionLower.includes('comisión 1 streaming') ||
+      commissionLower.includes('comisión 2 presencial') ||
+      commissionLower.includes('comisión 2 streaming') ||
+      commissionLower.includes('comisión 4 presencial') ||
+      commissionLower.includes('comisión 4 streaming')) {
+    return 'david';
+  }
+  
+  // Comisiones de Marion
+  if (commissionLower.includes('comisión 11 presencial') || 
+      commissionLower.includes('comisión 11 streaming') ||
+      commissionLower.includes('comisión 12 presencial') ||
+      commissionLower.includes('comisión 12 streaming') ||
+      commissionLower.includes('sábado online')) {
+    return 'marion';
+  }
+
+  // Por defecto, si no se puede determinar, asignar a Marion
+  return 'marion';
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -25,25 +53,7 @@ export async function GET() {
     }
 
     // Determinar el instructor basado en la comisión del estudiante
-    let instructor = '';
-    if (student.commission) {
-      if (student.commission.includes('marion') || 
-          student.commission.includes('Marion') || 
-          student.commission.includes('MARION')) {
-        instructor = 'marion';
-      } else if (student.commission.includes('david') || 
-                 student.commission.includes('David') || 
-                 student.commission.includes('DAVID')) {
-        instructor = 'david';
-      }
-    }
-
-    if (!instructor) {
-      return NextResponse.json(
-        { error: 'No se pudo determinar el instructor para la comisión del estudiante' },
-        { status: 400 }
-      );
-    }
+    const instructor = getInstructorFromCommission(student.commission || '');
 
     // Obtener las secciones del evento del estudiante filtradas por instructor
     const sections = await db.collection('sections')
