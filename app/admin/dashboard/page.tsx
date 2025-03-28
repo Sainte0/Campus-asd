@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
@@ -12,6 +13,8 @@ export default function AdminDashboard() {
   const [deleting, setDeleting] = useState(false);
   const [syncResult, setSyncResult] = useState<any>(null);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -31,20 +34,40 @@ export default function AdminDashboard() {
     setSyncResult(null);
 
     try {
-      const response = await fetch('/api/sync-students', {
+      const response = await fetch('/api/sync/eventbrite', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID,
+          page: currentPage
+        })
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Error al sincronizar estudiantes');
+        throw new Error(data.message || 'Error al sincronizar estudiantes');
       }
 
       const data = await response.json();
       setSyncResult(data.results);
+
+      if (data.status === 'partial') {
+        setHasMore(true);
+        setCurrentPage(data.nextPage);
+        toast.success(`Página ${currentPage} completada. Hay más páginas pendientes.`, {
+          duration: 5000
+        });
+      } else if (data.status === 'success') {
+        setHasMore(false);
+        setCurrentPage(1);
+        toast.success('Sincronización completada exitosamente');
+      }
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Error al sincronizar estudiantes');
+      toast.error('Error en la sincronización');
     } finally {
       setSyncing(false);
     }
@@ -164,8 +187,29 @@ export default function AdminDashboard() {
                       : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
                   }`}
                 >
-                  {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
+                  {syncing ? 'Sincronizando...' : hasMore ? `Sincronizar Página ${currentPage}` : 'Sincronizar Ahora'}
                 </button>
+                
+                {syncResult && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold mb-2">Resultados de la sincronización:</h3>
+                    <p>Total procesados: {syncResult.total}</p>
+                    <p>Estudiantes creados/actualizados: {syncResult.processed}</p>
+                    <p>Omitidos: {syncResult.skipped}</p>
+                    <p>Errores: {syncResult.errors}</p>
+                    {hasMore && (
+                      <p className="mt-2 text-blue-600">
+                        Hay más páginas pendientes. Haga clic en "Sincronizar" nuevamente para continuar.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {error && (
+                  <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
+                    {error}
+                  </div>
+                )}
               </div>
             </div>
 

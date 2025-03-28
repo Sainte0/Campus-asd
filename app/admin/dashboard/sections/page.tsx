@@ -322,24 +322,26 @@ export default function SectionsManagement() {
       setSyncProgress(0);
       setSyncResults(null);
 
-      const response = await fetch('/api/sync-students', {
+      const response = await fetch('/api/sync/eventbrite', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          eventId: process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID,
+          page: 1
+        })
       });
 
       const data = await response.json();
       setSyncResults(data);
 
-      if (data.success) {
-        toast.success('Sincronización completada');
-        if (data.nextBatch) {
-          toast(`${data.results.pending.length} estudiantes pendientes. Por favor, sincronice nuevamente.`, {
-            icon: 'ℹ️',
-            duration: 5000
-          });
-        }
+      if (data.status === 'success') {
+        toast.success('Sincronización completada exitosamente');
+      } else if (data.status === 'partial') {
+        toast.success(`Página 1 completada. Hay más páginas pendientes.`, {
+          duration: 5000
+        });
       } else {
         toast.error('Error en la sincronización');
       }
@@ -758,14 +760,14 @@ export default function SectionsManagement() {
           {syncResults && (
             <div className="mt-4 p-4 bg-gray-100 rounded-lg">
               <h3 className="font-semibold mb-2">Resultados de la sincronización:</h3>
-              <p>Total de estudiantes: {syncResults.results.totalStudents}</p>
-              <p>Estudiantes creados: {syncResults.results.created}</p>
-              <p>Estudiantes actualizados: {syncResults.results.updated}</p>
-              <p>Errores: {syncResults.results.errors}</p>
-              {syncResults.results.pending.length > 0 && (
+              <p>Total procesados: {syncResults.total}</p>
+              <p>Estudiantes creados/actualizados: {syncResults.processed}</p>
+              <p>Omitidos: {syncResults.skipped}</p>
+              <p>Errores: {syncResults.errors}</p>
+              {syncResults.status === 'partial' && (
                 <div className="mt-2">
-                  <p className="text-yellow-600 font-semibold">
-                    {syncResults.results.pending.length} estudiantes pendientes
+                  <p className="text-blue-600 font-semibold">
+                    Hay más páginas pendientes
                   </p>
                   <p className="text-sm text-gray-600">
                     Por favor, haga clic en "Sincronizar estudiantes" nuevamente para procesar el siguiente lote.
