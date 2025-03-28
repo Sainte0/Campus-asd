@@ -46,6 +46,10 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleStudentRedirect = () => {
+    router.push('/');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -148,12 +152,12 @@ export default function AdminLoginPage() {
                 <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <a
-                  href="/"
-                  className="px-2 bg-white text-primary hover:text-accent"
+                <button
+                  onClick={handleStudentRedirect}
+                  className="px-2 bg-white text-primary hover:text-accent cursor-pointer"
                 >
                   ¿Eres estudiante? Ingresa aquí
-                </a>
+                </button>
               </div>
             </div>
           </div>
