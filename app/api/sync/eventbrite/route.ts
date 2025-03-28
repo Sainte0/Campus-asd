@@ -23,16 +23,19 @@ async function getEventAttendees(eventId: string, page: number = 1, pageSize: nu
 
     const data = await response.json();
     console.log(`✅ Página ${page}: ${data.attendees?.length || 0} asistentes encontrados`);
+    console.log(`📊 Información de paginación:`, {
+      has_more: data.pagination.has_more,
+      page_count: data.pagination.page_count,
+      object_count: data.pagination.object_count
+    });
+    
     return {
       attendees: data.attendees || [],
       pagination: data.pagination
     };
   } catch (error) {
     console.error('❌ Error en getEventAttendees:', error);
-    return {
-      attendees: [],
-      pagination: { has_more: false }
-    };
+    throw error; // Propagar el error para manejarlo en la función principal
   }
 }
 
@@ -174,28 +177,54 @@ export async function POST(request: Request) {
     while (hasMore) {
       console.log(`\n📄 Procesando página ${page}...`);
       
-      const { attendees, pagination } = await getEventAttendees(eventId, page);
-      if (attendees.length === 0) break;
+      try {
+        const { attendees, pagination } = await getEventAttendees(eventId, page);
+        
+        if (attendees.length === 0) {
+          console.log('❌ No se encontraron asistentes en esta página');
+          break;
+        }
 
-      batchResults.total += attendees.length;
-      const results = await processAttendeesBatch(attendees, eventId);
-      
-      batchResults.processed += results.processed;
-      batchResults.skipped += results.skipped;
-      batchResults.errors += results.errors;
-      batchResults.details.push(...results.details);
+        batchResults.total += attendees.length;
+        const results = await processAttendeesBatch(attendees, eventId);
+        
+        batchResults.processed += results.processed;
+        batchResults.skipped += results.skipped;
+        batchResults.errors += results.errors;
+        batchResults.details.push(...results.details);
 
-      hasMore = pagination.has_more;
-      page++;
+        hasMore = pagination.has_more;
+        console.log(`📊 Estado de paginación:`, {
+          has_more: pagination.has_more,
+          page_count: pagination.page_count,
+          current_page: page,
+          total_processed: batchResults.total
+        });
 
-      // Pequeña pausa entre páginas para evitar rate limiting
-      if (hasMore) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        page++;
+
+        // Pequeña pausa entre páginas para evitar rate limiting
+        if (hasMore) {
+          console.log('⏳ Esperando 1 segundo antes de la siguiente página...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        console.error(`❌ Error procesando página ${page}:`, error);
+        // Intentar la siguiente página en caso de error
+        page++;
+        continue;
       }
     }
 
     const finalStudents = await User.find({ eventId });
     console.log(`\n✅ Sincronización completada. Total de estudiantes: ${finalStudents.length}`);
+    console.log(`📊 Resumen final:`, {
+      total_procesados: batchResults.total,
+      creados_actualizados: batchResults.processed,
+      omitidos: batchResults.skipped,
+      errores: batchResults.errors,
+      total_en_bd: finalStudents.length
+    });
     
     return NextResponse.json({
       status: 'success',
