@@ -34,10 +34,36 @@ function getYouTubeEmbedUrl(url: string) {
 
 function getGoogleDocsPreviewUrl(url: string) {
   try {
-    return url.replace('/edit', '/preview');
+    // Si la URL es una ruta de la API o una ruta relativa
+    if (url.startsWith('/') || url.startsWith('http://localhost') || url.startsWith('https://campus-asd.vercel.app')) {
+      // Usamos la URL directamente ya que el documento viene de nuestra API/BD
+      return url;
+    }
+    // Handle Google Docs URLs
+    else if (url.includes('docs.google.com')) {
+      if (url.includes('/edit')) {
+        return url.replace('/edit', '/preview');
+      } else if (url.includes('/view')) {
+        return url;
+      } else {
+        return url + '/preview';
+      }
+    }
+    // Handle Google Drive URLs
+    else if (url.includes('drive.google.com')) {
+      const fileId = url.match(/\/d\/(.*?)(\/|$)/)?.[1];
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+    }
+    return url;
   } catch {
     return url;
   }
+}
+
+function isPdfUrl(url: string): boolean {
+  return url.toLowerCase().endsWith('.pdf');
 }
 
 export default function StudentDashboard() {
@@ -158,6 +184,7 @@ export default function StudentDashboard() {
               {sections.map((section) => {
                 const embedUrl = getYouTubeEmbedUrl(section.videoUrl);
                 const docsPreviewUrl = section.pdfUrl ? getGoogleDocsPreviewUrl(section.pdfUrl) : null;
+                const isPdf = section.pdfUrl ? isPdfUrl(section.pdfUrl) : false;
                 
                 return (
                   <div key={section._id} className="card overflow-hidden">
@@ -170,7 +197,7 @@ export default function StudentDashboard() {
 
                     <div className="grid md:grid-cols-2 gap-6 px-6 pb-6">
                       <div className="space-y-4">
-                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden shadow-inner">
                           {embedUrl ? (
                             <iframe
                               src={embedUrl}
@@ -199,13 +226,27 @@ export default function StudentDashboard() {
 
                       {section.pdfUrl && (
                         <div className="space-y-4">
-                          <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                          <div className="h-[400px] bg-gray-100 rounded-lg overflow-hidden shadow-inner">
                             {docsPreviewUrl ? (
-                              <iframe
-                                src={docsPreviewUrl}
-                                className="w-full h-full"
-                                allowFullScreen
-                              />
+                              isPdf ? (
+                                <object
+                                  data={docsPreviewUrl}
+                                  type="application/pdf"
+                                  className="w-full h-full"
+                                >
+                                  <iframe
+                                    src={docsPreviewUrl}
+                                    className="w-full h-full"
+                                    allowFullScreen
+                                  />
+                                </object>
+                              ) : (
+                                <iframe
+                                  src={docsPreviewUrl}
+                                  className="w-full h-full"
+                                  allowFullScreen
+                                />
+                              )
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <p className="text-gray-500">Vista previa no disponible</p>
