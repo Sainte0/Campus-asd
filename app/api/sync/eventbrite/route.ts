@@ -3,10 +3,10 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 
-async function getEventAttendees(eventId: string) {
-  console.log('🔍 Obteniendo asistentes del evento:', eventId);
+async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
+  console.log(`🔍 Obteniendo asistentes del evento: ${eventId}, página: ${page}`);
   
-  const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers`;
+  const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers&page_size=${pageSize}&page=${page}`;
   console.log('🌐 URL de la petición:', url);
 
   try {
@@ -35,12 +35,110 @@ async function getEventAttendees(eventId: string) {
       throw new Error('Formato de respuesta inválido');
     }
 
-    console.log('👥 Asistentes encontrados:', data.attendees.length);
-    return data.attendees;
+    return {
+      attendees: data.attendees,
+      pagination: data.pagination
+    };
   } catch (error) {
     console.error('❌ Error en getEventAttendees:', error);
     throw error;
   }
+}
+
+async function processAttendeesBatch(attendees: any[], eventId: string) {
+  const results = {
+    processed: 0,
+    skipped: 0,
+    errors: 0,
+    details: [] as any[]
+  };
+
+  for (const attendee of attendees) {
+    try {
+      const email = attendee.profile?.email;
+      const name = `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim();
+      
+      // Skip Info Requested attendees
+      if (name === 'Info Requested Info Requested' || email === 'Info Requested') {
+        results.details.push({
+          email,
+          status: 'skipped',
+          reason: 'info_requested'
+        });
+        results.skipped++;
+        continue;
+      }
+
+      // Find documento and commission in answers
+      let documento = null;
+      let commission = null;
+      if (attendee.answers && Array.isArray(attendee.answers)) {
+        for (const answer of attendee.answers) {
+          if (answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID) {
+            documento = answer.answer;
+          } else if (answer.question_id === process.env.EVENTBRITE_COMMISSION_QUESTION_ID) {
+            commission = answer.answer;
+          }
+        }
+      }
+
+      if (!documento) {
+        results.details.push({
+          email,
+          status: 'skipped',
+          reason: 'no_documento'
+        });
+        results.skipped++;
+        continue;
+      }
+
+      // Create or update user
+      const existingUser = await User.findOne({ email });
+      
+      if (existingUser) {
+        existingUser.name = name;
+        existingUser.documento = documento;
+        existingUser.eventId = eventId;
+        existingUser.eventbriteId = attendee.id;
+        existingUser.commission = commission;
+        await existingUser.save();
+        results.details.push({
+          email,
+          status: 'updated',
+          commission: commission || 'no_commission'
+        });
+      } else {
+        const hashedPassword = await bcrypt.hash(documento, 10);
+        const newUser = new User({
+          name,
+          email,
+          password: hashedPassword,
+          documento,
+          role: 'student',
+          eventId,
+          eventbriteId: attendee.id,
+          commission: commission
+        });
+        await newUser.save();
+        results.details.push({
+          email,
+          status: 'created',
+          commission: commission || 'no_commission'
+        });
+      }
+      results.processed++;
+    } catch (error) {
+      console.error('❌ Error procesando asistente:', error);
+      results.details.push({
+        email: attendee.profile?.email || 'unknown',
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      });
+      results.errors++;
+    }
+  }
+
+  return results;
 }
 
 export async function POST(request: Request) {
@@ -64,96 +162,39 @@ export async function POST(request: Request) {
     const currentStudents = await User.find({ eventId });
     console.log(`📊 Estudiantes actuales en la base de datos para el evento ${eventId}:`, currentStudents.length);
 
-    // Get all attendees from Eventbrite
-    const attendees = await getEventAttendees(eventId);
-    console.log(`📊 Total de asistentes en Eventbrite para el evento ${eventId}:`, attendees.length);
-
-    // Process each attendee
-    const results = {
-      total: attendees.length,
+    // Process attendees in batches
+    let page = 1;
+    let hasMore = true;
+    const batchResults = {
+      total: 0,
       processed: 0,
       skipped: 0,
       errors: 0,
       details: [] as any[]
     };
 
-    for (const attendee of attendees) {
-      try {
-        const email = attendee.profile?.email;
-        const name = `${attendee.profile?.first_name} ${attendee.profile?.last_name}`.trim();
-        
-        // Skip Info Requested attendees
-        if (name === 'Info Requested Info Requested' || email === 'Info Requested') {
-          results.details.push({
-            email,
-            status: 'skipped',
-            reason: 'info_requested'
-          });
-          results.skipped++;
-          continue;
-        }
+    while (hasMore) {
+      console.log(`\n📄 Procesando página ${page}...`);
+      
+      // Get attendees for current page
+      const { attendees, pagination } = await getEventAttendees(eventId, page);
+      batchResults.total += attendees.length;
 
-        // Find documento in answers
-        let documento = null;
-        if (attendee.answers && Array.isArray(attendee.answers)) {
-          const documentoAnswer = attendee.answers.find(
-            (answer: any) => answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID
-          );
-          if (documentoAnswer) {
-            documento = documentoAnswer.answer;
-          }
-        }
+      // Process current batch
+      const results = await processAttendeesBatch(attendees, eventId);
+      
+      // Update batch results
+      batchResults.processed += results.processed;
+      batchResults.skipped += results.skipped;
+      batchResults.errors += results.errors;
+      batchResults.details.push(...results.details);
 
-        if (!documento) {
-          results.details.push({
-            email,
-            status: 'skipped',
-            reason: 'no_documento'
-          });
-          results.skipped++;
-          continue;
-        }
+      // Check if there are more pages
+      hasMore = pagination.has_more;
+      page++;
 
-        // Create or update user
-        const existingUser = await User.findOne({ email });
-        
-        if (existingUser) {
-          existingUser.name = name;
-          existingUser.documento = documento;
-          existingUser.eventId = eventId;
-          existingUser.eventbriteId = attendee.id;
-          await existingUser.save();
-          results.details.push({
-            email,
-            status: 'updated'
-          });
-        } else {
-          const hashedPassword = await bcrypt.hash(documento, 10);
-          const newUser = new User({
-            name,
-            email,
-            password: hashedPassword,
-            documento,
-            role: 'student',
-            eventId,
-            eventbriteId: attendee.id
-          });
-          await newUser.save();
-          results.details.push({
-            email,
-            status: 'created'
-          });
-        }
-        results.processed++;
-      } catch (error) {
-        console.error('❌ Error procesando asistente:', error);
-        results.details.push({
-          email: attendee.profile?.email || 'unknown',
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        });
-        results.errors++;
-      }
+      // Add a small delay between requests to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Get final count of students in database
@@ -162,7 +203,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       status: 'success',
-      results,
+      results: batchResults,
       databaseCount: finalStudents.length
     });
 
