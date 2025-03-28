@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
+import { Footer } from '../components/Footer';
 
 interface Section {
   _id: string;
@@ -97,7 +98,12 @@ export default function StudentDashboard() {
   };
 
   if (status === 'loading') {
-    return <div className="flex justify-center items-center min-h-screen">Cargando...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="loading-spinner" />
+        <span className="ml-3">Cargando...</span>
+      </div>
+    );
   }
 
   if (!session || session.user?.role !== 'student') {
@@ -105,12 +111,12 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background-light">
+    <div className="min-h-screen bg-background-light flex flex-col">
       <Header />
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="flex-grow max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="page-title">Mis Secciones</h1>
+          <h1 className="page-title">Mis Clases</h1>
           
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -119,9 +125,17 @@ export default function StudentDashboard() {
           )}
 
           {loading ? (
-            <p>Cargando secciones...</p>
+            <div className="flex justify-center items-center py-12">
+              <div className="loading-spinner" />
+              <span className="ml-3">Cargando clases...</span>
+            </div>
           ) : sections.length === 0 ? (
-            <p>No hay secciones disponibles.</p>
+            <div className="text-center py-12">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <p className="text-gray-600">No hay clases disponibles en este momento.</p>
+            </div>
           ) : (
             <div className="grid gap-6">
               {sections.map((section) => (
@@ -131,17 +145,20 @@ export default function StudentDashboard() {
                 >
                   <div className="p-6">
                     <h2 className="section-title">
-                      Semana {section.weekNumber}: {section.title}
+                      Clase {section.weekNumber}: {section.title}
                     </h2>
-                    <p className="text-gray-600 mb-4">{section.description}</p>
+                    <p className="text-gray-600 mb-6">{section.description}</p>
                     
-                    <div className="space-x-4">
+                    <div className="flex flex-wrap gap-4">
                       <a
                         href={section.videoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn-primary"
                       >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                        </svg>
                         Ver Video
                       </a>
                       {section.pdfUrl && (
@@ -151,6 +168,9 @@ export default function StudentDashboard() {
                           rel="noopener noreferrer"
                           className="btn-primary bg-green-600 hover:bg-green-700"
                         >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                          </svg>
                           Ver PDF
                         </a>
                       )}
@@ -163,6 +183,8 @@ export default function StudentDashboard() {
           {renderPagination()}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 } 
