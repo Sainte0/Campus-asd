@@ -23,6 +23,23 @@ interface PaginationInfo {
   perPage: number;
 }
 
+function getYouTubeEmbedUrl(url: string) {
+  try {
+    const videoId = url.split('v=')[1]?.split('&')[0];
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function getGoogleDocsPreviewUrl(url: string) {
+  try {
+    return url.replace('/edit', '/preview');
+  } catch {
+    return url;
+  }
+}
+
 export default function StudentDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -137,47 +154,81 @@ export default function StudentDashboard() {
               <p className="text-gray-600">No hay clases disponibles en este momento.</p>
             </div>
           ) : (
-            <div className="grid gap-6">
-              {sections.map((section) => (
-                <div
-                  key={section._id}
-                  className="card"
-                >
-                  <div className="p-6">
-                    <h2 className="section-title">
-                      Clase {section.weekNumber}: {section.title}
-                    </h2>
-                    <p className="text-gray-600 mb-6">{section.description}</p>
-                    
-                    <div className="flex flex-wrap gap-4">
-                      <a
-                        href={section.videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-primary"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                        </svg>
-                        Ver Video
-                      </a>
-                      {section.pdfUrl && (
+            <div className="grid gap-8">
+              {sections.map((section) => {
+                const embedUrl = getYouTubeEmbedUrl(section.videoUrl);
+                const docsPreviewUrl = section.pdfUrl ? getGoogleDocsPreviewUrl(section.pdfUrl) : null;
+                
+                return (
+                  <div key={section._id} className="card overflow-hidden">
+                    <div className="p-6">
+                      <h2 className="section-title">
+                        Clase {section.weekNumber}: {section.title}
+                      </h2>
+                      <p className="text-gray-600 mb-6">{section.description}</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6 px-6 pb-6">
+                      <div className="space-y-4">
+                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                          {embedUrl ? (
+                            <iframe
+                              src={embedUrl}
+                              className="w-full h-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <p className="text-gray-500">Vista previa no disponible</p>
+                            </div>
+                          )}
+                        </div>
                         <a
-                          href={section.pdfUrl}
+                          href={section.videoUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-primary bg-green-600 hover:bg-green-700"
+                          className="btn-primary w-full justify-center"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                           </svg>
-                          Ver PDF
+                          Ver Video Completo
                         </a>
+                      </div>
+
+                      {section.pdfUrl && (
+                        <div className="space-y-4">
+                          <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                            {docsPreviewUrl ? (
+                              <iframe
+                                src={docsPreviewUrl}
+                                className="w-full h-full"
+                                allowFullScreen
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <p className="text-gray-500">Vista previa no disponible</p>
+                              </div>
+                            )}
+                          </div>
+                          <a
+                            href={section.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-primary bg-green-600 hover:bg-green-700 w-full justify-center"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            Ver Documento Completo
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {renderPagination()}

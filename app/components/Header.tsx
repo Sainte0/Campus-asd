@@ -14,17 +14,28 @@ export function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
-              <Image
-                src="/judiciales.jpeg"
-                alt="Judiciales Córdoba Logo"
-                width={180}
-                height={80}
-                className="campus-logo"
-                priority
-              />
-              <div className="h-8 w-px bg-white/30" />
+              <div className="flex items-center space-x-4">
+                <Image
+                  src="/judiciales.jpeg"
+                  alt="Judiciales Córdoba Logo"
+                  width={140}
+                  height={60}
+                  className="campus-logo"
+                  priority
+                />
+                <div className="h-12 w-px bg-white/30" />
+                <Image
+                  src="/asd.jpeg"
+                  alt="ASD Logo"
+                  width={140}
+                  height={60}
+                  className="campus-logo"
+                  priority
+                />
+              </div>
+              <div className="h-12 w-px bg-white/30 hidden sm:block" />
               <h2 className="text-white text-xl font-semibold hidden sm:block">
-                Campus Virtual ASD
+                Campus Virtual
               </h2>
             </div>
             <div className="flex items-center space-x-4">
@@ -50,12 +61,12 @@ export function Header() {
                 <a href="#" className="nav-link">
                   Inicio
                 </a>
-                <a href="#" className="nav-link">
+                <span className="nav-link cursor-not-allowed opacity-50">
                   Calendario
-                </a>
-                <a href="#" className="nav-link">
+                </span>
+                <span className="nav-link cursor-not-allowed opacity-50">
                   Recursos
-                </a>
+                </span>
               </div>
             </div>
             <div className="flex items-center space-x-4">
