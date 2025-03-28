@@ -5,7 +5,7 @@ import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-export default function StudentLoginPage() {
+export default function AdminLoginPage() {
   const { data: session, status } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,15 +28,15 @@ export default function StudentLoginPage() {
       if (result?.error) {
         setError('Credenciales inválidas');
       } else {
-        // Verificar si es estudiante antes de redirigir
+        // Verificar si es admin antes de redirigir
         const response = await fetch('/api/auth/session');
         const session = await response.json();
         
-        if (session?.user?.role === 'student') {
-          router.push('/student');
+        if (session?.user?.role === 'admin') {
+          router.push('/admin/dashboard');
         } else {
-          setError('No tienes permisos de estudiante');
-          signIn('credentials', { callbackUrl: '/admin/login' });
+          setError('No tienes permisos de administrador');
+          signIn('credentials', { callbackUrl: '/' });
         }
       }
     } catch (error) {
@@ -47,7 +47,7 @@ export default function StudentLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex items-center justify-center space-x-4 mb-6">
           <Image
@@ -72,7 +72,7 @@ export default function StudentLoginPage() {
           Campus Virtual
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Portal de Estudiantes
+          Portal de Administración
         </p>
       </div>
 
@@ -97,24 +97,24 @@ export default function StudentLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                  placeholder="estudiante@ejemplo.com"
+                  placeholder="admin@ejemplo.com"
                 />
               </div>
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Documento
+                Contraseña
               </label>
               <div className="mt-1">
                 <input
                   id="password"
-                  type="text"
+                  type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                  placeholder="Ingresa tu documento"
+                  placeholder="••••••••"
                 />
               </div>
             </div>
@@ -149,10 +149,10 @@ export default function StudentLoginPage() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <a
-                  href="/admin/login"
+                  href="/"
                   className="px-2 bg-white text-primary hover:text-accent"
                 >
-                  ¿Eres administrador? Ingresa aquí
+                  ¿Eres estudiante? Ingresa aquí
                 </a>
               </div>
             </div>
@@ -161,4 +161,4 @@ export default function StudentLoginPage() {
       </div>
     </div>
   );
-}
+} 
