@@ -207,6 +207,7 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
     existingUser.documento = documento;
     existingUser.eventId = eventId;
     existingUser.eventbriteId = attendee.id;
+    existingUser.commission = attendee.ticket_class_name;
     await existingUser.save();
     console.log('✅ Usuario actualizado:', email);
     return { action: 'updated', email, eventId };
@@ -220,7 +221,8 @@ async function processAttendee(attendee: any): Promise<ProcessResult> {
       documento,
       role: 'student',
       eventId,
-      eventbriteId: attendee.id
+      eventbriteId: attendee.id,
+      commission: attendee.ticket_class_name
     });
     await newUser.save();
     console.log('✅ Usuario creado:', email);
