@@ -21,6 +21,20 @@ const sectionSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  instructor: {
+    type: String,
+    required: true,
+    enum: ['marion', 'david'],
+  },
+  commissionGroup: {
+    type: String,
+    required: true,
+    enum: ['marion', 'david'],
+  },
+  eventId: {
+    type: String,
+    required: true,
+  }
 }, {
   timestamps: true,
 });

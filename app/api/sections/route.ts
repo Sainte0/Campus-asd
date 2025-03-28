@@ -16,12 +16,15 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const eventId = searchParams.get('eventId');
+    const instructor = searchParams.get('instructor');
     const skip = (page - 1) * limit;
 
     const { db } = await connectToDatabase();
     
-    // Construir el filtro basado en el eventId
-    const filter = eventId ? { eventId } : {};
+    // Construir el filtro basado en el eventId y instructor
+    const filter: any = {};
+    if (eventId) filter.eventId = eventId;
+    if (instructor) filter.instructor = instructor;
     
     // Obtener el total de documentos para la paginación
     const total = await db.collection('sections').countDocuments(filter);
@@ -68,9 +71,27 @@ export async function POST(request: Request) {
     const { db } = await connectToDatabase();
     const data = await request.json();
     
+    // Validar que el instructor sea válido
+    if (!data.instructor || !['marion', 'david'].includes(data.instructor.toLowerCase())) {
+      return NextResponse.json(
+        { error: 'Instructor inválido. Debe ser "marion" o "david"' },
+        { status: 400 }
+      );
+    }
+
+    // Validar que el commissionGroup sea válido
+    if (!data.commissionGroup || !['marion', 'david'].includes(data.commissionGroup.toLowerCase())) {
+      return NextResponse.json(
+        { error: 'Grupo de comisión inválido. Debe ser "marion" o "david"' },
+        { status: 400 }
+      );
+    }
+
     // Crear la nueva sección
     const result = await db.collection('sections').insertOne({
       ...data,
+      instructor: data.instructor.toLowerCase(),
+      commissionGroup: data.commissionGroup.toLowerCase(),
       createdAt: new Date(),
       updatedAt: new Date()
     });

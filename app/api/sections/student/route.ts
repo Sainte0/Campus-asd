@@ -12,7 +12,7 @@ export async function GET() {
 
     const { db } = await connectToDatabase();
     
-    // Obtener el estudiante para obtener su eventId
+    // Obtener el estudiante para obtener su eventId y commission
     const student = await db.collection('users').findOne({
       email: session.user.email
     });
@@ -24,9 +24,33 @@ export async function GET() {
       );
     }
 
-    // Obtener las secciones del evento del estudiante
+    // Determinar el instructor basado en la comisión del estudiante
+    let instructor = '';
+    if (student.commission) {
+      if (student.commission.includes('marion') || 
+          student.commission.includes('Marion') || 
+          student.commission.includes('MARION')) {
+        instructor = 'marion';
+      } else if (student.commission.includes('david') || 
+                 student.commission.includes('David') || 
+                 student.commission.includes('DAVID')) {
+        instructor = 'david';
+      }
+    }
+
+    if (!instructor) {
+      return NextResponse.json(
+        { error: 'No se pudo determinar el instructor para la comisión del estudiante' },
+        { status: 400 }
+      );
+    }
+
+    // Obtener las secciones del evento del estudiante filtradas por instructor
     const sections = await db.collection('sections')
-      .find({ eventId: student.eventId })
+      .find({ 
+        eventId: student.eventId,
+        instructor: instructor
+      })
       .sort({ weekNumber: 1 })
       .toArray();
 
