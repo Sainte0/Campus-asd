@@ -17,10 +17,16 @@ interface EventbriteProfile {
   last_name: string;
 }
 
+interface EventbriteTicket {
+  name: string;
+  description: string;
+}
+
 interface EventbriteAttendee {
   id: string;
   profile: EventbriteProfile;
   answers: EventbriteAnswer[];
+  ticket_class: EventbriteTicket;
 }
 
 // IDs de las preguntas para cada evento
@@ -36,7 +42,7 @@ const COMMISSION_QUESTION_IDS: Record<string, string> = {
 };
 
 async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
-  const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers&page_size=${pageSize}&page=${page}`;
+  const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers,ticket_class&page_size=${pageSize}&page=${page}`;
   
   try {
     console.log(`🔍 Obteniendo página ${page} de asistentes...`);
@@ -103,6 +109,13 @@ async function processAttendeesBatch(attendees: EventbriteAttendee[], eventId: s
 
         let documento = null;
         let commission = null;
+
+        // Obtener la comisión del nombre del ticket
+        if (attendee.ticket_class?.name) {
+          commission = attendee.ticket_class.name;
+          console.log(`🎫 Ticket seleccionado para ${email}: ${commission}`);
+        }
+
         if (attendee.answers && Array.isArray(attendee.answers)) {
           console.log(`\n🔍 Procesando respuestas para ${email}:`);
           console.log('📋 Todas las preguntas disponibles:', attendee.answers.map((a: EventbriteAnswer) => ({
@@ -112,32 +125,17 @@ async function processAttendeesBatch(attendees: EventbriteAttendee[], eventId: s
             type: a.type
           })));
           
-          // Buscar preguntas que contengan la palabra "comisión" o "commission"
-          const possibleCommissionQuestions = attendee.answers.filter(a => 
-            a.question.toLowerCase().includes('comisión') || 
-            a.question.toLowerCase().includes('commission')
-          );
-          
-          if (possibleCommissionQuestions.length > 0) {
-            console.log('🎯 Posibles preguntas de comisión encontradas:', possibleCommissionQuestions);
-          }
-          
           for (const answer of attendee.answers) {
             console.log(`\n📝 Analizando respuesta:`, {
               question_id: answer.question_id,
               question: answer.question,
               answer: answer.answer,
-              expected_dni_id: DNI_QUESTION_IDS[eventId],
-              expected_commission_id: COMMISSION_QUESTION_IDS[eventId]
+              expected_dni_id: DNI_QUESTION_IDS[eventId]
             });
             
-            // Usar el ID de pregunta específico para el evento
             if (answer.question_id === DNI_QUESTION_IDS[eventId]) {
               documento = answer.answer;
               console.log(`✅ DNI encontrado para ${email}: ${documento}`);
-            } else if (answer.question_id === COMMISSION_QUESTION_IDS[eventId]) {
-              commission = answer.answer;
-              console.log(`✅ Comisión encontrada para ${email}: ${commission}`);
             }
           }
         }
