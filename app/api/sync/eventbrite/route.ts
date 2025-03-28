@@ -31,11 +31,14 @@ async function getEventAttendees(eventId: string, page: number = 1, pageSize: nu
     
     return {
       attendees: data.attendees || [],
-      pagination: data.pagination
+      pagination: {
+        ...data.pagination,
+        has_more: page < data.pagination.page_count
+      }
     };
   } catch (error) {
     console.error('❌ Error en getEventAttendees:', error);
-    throw error; // Propagar el error para manejarlo en la función principal
+    throw error;
   }
 }
 
@@ -69,7 +72,12 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
         let documento = null;
         let commission = null;
         if (attendee.answers && Array.isArray(attendee.answers)) {
+          console.log(`🔍 Procesando respuestas para ${email}:`, attendee.answers);
           for (const answer of attendee.answers) {
+            console.log(`📝 Respuesta:`, {
+              question_id: answer.question_id,
+              answer: answer.answer
+            });
             if (answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID) {
               documento = answer.answer;
             } else if (answer.question_id === process.env.EVENTBRITE_COMMISSION_QUESTION_ID) {
@@ -79,6 +87,7 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
         }
 
         if (!documento) {
+          console.log(`⚠️ No se encontró documento para ${email}`);
           results.details.push({
             email,
             status: 'skipped',
@@ -147,6 +156,11 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
 export async function POST(request: Request) {
   try {
     console.log('\n🔄 Iniciando sincronización manual de Eventbrite');
+    console.log('🔑 Variables de entorno:', {
+      EVENTBRITE_DOCUMENTO_QUESTION_ID: process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID,
+      EVENTBRITE_COMMISSION_QUESTION_ID: process.env.EVENTBRITE_COMMISSION_QUESTION_ID
+    });
+    
     const { eventId } = await request.json();
     
     if (!eventId) {
