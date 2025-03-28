@@ -52,7 +52,21 @@ export default function StudentRegistrationForm({ onClose }: StudentRegistration
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
-      <h3 className="text-lg font-semibold mb-4">Solicitud de Registro</h3>
+      <div className="mb-6 text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Solicitud de Acceso al Campus</h3>
+        <p className="text-sm text-gray-600">
+          Complete este formulario si no puede acceder al campus. Una vez que enviemos su solicitud, 
+          nuestro equipo verificará su inscripción y le enviará un correo electrónico cuando su acceso 
+          esté habilitado.
+        </p>
+        <div className="mt-2 p-3 bg-blue-50 rounded-md">
+          <p className="text-sm text-blue-700">
+            Nota: El proceso puede demorar hasta 24 horas hábiles. Una vez aprobado, 
+            podrá ingresar usando su correo electrónico y número de documento.
+          </p>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">

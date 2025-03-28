@@ -161,7 +161,7 @@ export default function StudentLoginPage() {
                     onClick={() => setShowRegistrationForm(true)}
                     className="px-2 bg-white text-primary hover:text-accent cursor-pointer"
                   >
-                    ¿No puedes ingresar? Regístrate aquí
+                    ¿No puedes ingresar? Haz click aquí
                   </button>
                 </div>
               </div>

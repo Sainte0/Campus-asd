@@ -20,7 +20,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (status === 'loading') return;
-    
+
     if (!session || session.user?.role !== 'admin') {
       router.push('/');
     }
@@ -187,11 +187,10 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <button
                       onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
-                      className={`w-full p-3 rounded-lg border ${
-                        selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
+                      className={`w-full p-3 rounded-lg border ${selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-300'
-                      }`}
+                        }`}
                     >
                       <h4 className="font-medium">Evento 1</h4>
                       <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
@@ -199,11 +198,10 @@ export default function AdminDashboard() {
 
                     <button
                       onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
-                      className={`w-full p-3 rounded-lg border ${
-                        selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
+                      className={`w-full p-3 rounded-lg border ${selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-300'
-                      }`}
+                        }`}
                     >
                       <h4 className="font-medium">Evento 2</h4>
                       <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2}</p>
@@ -214,15 +212,14 @@ export default function AdminDashboard() {
                 <button
                   onClick={handleSync}
                   disabled={syncing || !selectedEvent}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                    syncing || !selectedEvent
+                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${syncing || !selectedEvent
                       ? 'bg-blue-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                  }`}
+                    }`}
                 >
                   {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
                 </button>
-                
+
                 {syncResult && (
                   <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                     <h3 className="font-semibold mb-2">Resultados de la sincronización:</h3>
@@ -232,7 +229,7 @@ export default function AdminDashboard() {
                     <p>Errores: {syncResult.errors}</p>
                   </div>
                 )}
-                
+
                 {error && (
                   <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
                     {error}
@@ -250,11 +247,10 @@ export default function AdminDashboard() {
                 <button
                   onClick={handleDeleteAllStudents}
                   disabled={deleting}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                    deleting
+                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${deleting
                       ? 'bg-red-400 cursor-not-allowed'
                       : 'bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
-                  }`}
+                    }`}
                 >
                   {deleting ? 'Eliminando...' : 'Eliminar Todos'}
                 </button>
@@ -264,7 +260,7 @@ export default function AdminDashboard() {
 
           <div className="mt-6">
             <PendingStudentRequests />
-            </div>  
+          </div>
         </div>
       </main>
     </div>

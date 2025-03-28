@@ -35,34 +35,22 @@ export default function PendingStudentRequests() {
     }
   };
 
-  const handleApprove = async (requestId: string) => {
-    try {
-      const response = await fetch(`/api/students/requests/${requestId}/approve`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) throw new Error('Error al aprobar la solicitud');
-      
-      toast.success('Solicitud aprobada exitosamente');
-      fetchRequests(); // Recargar la lista
-    } catch (error) {
-      toast.error('Error al aprobar la solicitud');
-      console.error(error);
+  const handleDelete = async (requestId: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta solicitud?')) {
+      return;
     }
-  };
 
-  const handleReject = async (requestId: string) => {
     try {
-      const response = await fetch(`/api/students/requests/${requestId}/reject`, {
-        method: 'POST',
+      const response = await fetch(`/api/students/requests/${requestId}`, {
+        method: 'DELETE',
       });
       
-      if (!response.ok) throw new Error('Error al rechazar la solicitud');
+      if (!response.ok) throw new Error('Error al eliminar la solicitud');
       
-      toast.success('Solicitud rechazada');
+      toast.success('Solicitud eliminada');
       fetchRequests(); // Recargar la lista
     } catch (error) {
-      toast.error('Error al rechazar la solicitud');
+      toast.error('Error al eliminar la solicitud');
       console.error(error);
     }
   };
@@ -79,8 +67,12 @@ export default function PendingStudentRequests() {
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
       <div className="px-4 py-5 sm:px-6">
         <h3 className="text-lg font-medium leading-6 text-gray-900">
-          Solicitudes de Registro Pendientes
+          Solicitudes de Acceso Pendientes
         </h3>
+        <p className="mt-1 text-sm text-gray-600">
+          Lista de estudiantes que han solicitado acceso al campus. Verifique su inscripción en Eventbrite 
+          antes de sincronizar los datos.
+        </p>
       </div>
       <div className="border-t border-gray-200">
         <ul className="divide-y divide-gray-200">
@@ -94,7 +86,7 @@ export default function PendingStudentRequests() {
                     </p>
                     <div className="ml-2 flex-shrink-0 flex">
                       <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        {request.status}
+                        Pendiente
                       </p>
                     </div>
                   </div>
@@ -114,18 +106,12 @@ export default function PendingStudentRequests() {
                     </div>
                   </div>
                 </div>
-                <div className="ml-5 flex-shrink-0 flex space-x-2">
+                <div className="ml-5 flex-shrink-0">
                   <button
-                    onClick={() => handleApprove(request._id)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    onClick={() => handleDelete(request._id)}
+                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   >
-                    Aprobar
-                  </button>
-                  <button
-                    onClick={() => handleReject(request._id)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Rechazar
+                    Eliminar
                   </button>
                 </div>
               </div>
