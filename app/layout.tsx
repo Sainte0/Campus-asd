@@ -1,7 +1,6 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
 import { RootLayoutClient } from './components/RootLayoutClient';
-import { AuthProvider } from './contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -24,10 +23,8 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
       </head>
       <body className={inter.className}>
-        <AuthProvider>
-          <Toaster position="top-center" />
-          <RootLayoutClient>{children}</RootLayoutClient>
-        </AuthProvider>
+        <Toaster position="top-center" />
+        <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
   );
