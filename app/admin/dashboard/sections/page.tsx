@@ -14,6 +14,8 @@ interface Section {
   videoUrl: string;
   pdfUrl?: string;
   eventId: string;
+  instructor: 'marion' | 'david';
+  commissionGroup: 'marion' | 'david';
 }
 
 interface PaginationInfo {
@@ -31,6 +33,7 @@ export default function SectionsManagement() {
   const [error, setError] = useState('');
   const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [selectedSubEvent, setSelectedSubEvent] = useState<'david' | 'marion' | null>(null);
 
   // Estado para el formulario
   const [weekNumber, setWeekNumber] = useState('');
@@ -38,6 +41,8 @@ export default function SectionsManagement() {
   const [description, setDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [instructor, setInstructor] = useState<'marion' | 'david'>('marion');
+  const [commissionGroup, setCommissionGroup] = useState<'marion' | 'david'>('marion');
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -55,14 +60,28 @@ export default function SectionsManagement() {
       router.push('/');
     } else {
       if (selectedEvent) {
-        fetchSections(currentPage);
+        // Si es el Evento 1, solo cargar secciones si hay un sub-evento seleccionado
+        if (selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1) {
+          if (selectedSubEvent) {
+            fetchSections(currentPage);
+          }
+        } else {
+          fetchSections(currentPage);
+        }
       }
     }
-  }, [session, status, router, currentPage, selectedEvent]);
+  }, [session, status, router, currentPage, selectedEvent, selectedSubEvent]);
 
   const fetchSections = async (page: number = 1) => {
     try {
-      const response = await fetch(`/api/sections?page=${page}&limit=10&eventId=${selectedEvent}`);
+      let url = `/api/sections?page=${page}&limit=10&eventId=${selectedEvent}`;
+      
+      // Si es el Evento 1 y hay un sub-evento seleccionado, agregar el filtro de instructor
+      if (selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && selectedSubEvent) {
+        url += `&instructor=${selectedSubEvent}`;
+      }
+
+      const response = await fetch(url);
       const data = await response.json();
       if (response.ok) {
         setSections(data.sections);
@@ -168,6 +187,8 @@ export default function SectionsManagement() {
         videoUrl,
         pdfUrl: fileUrl,
         eventId: selectedEvent,
+        instructor,
+        commissionGroup,
       };
 
       const response = await fetch('/api/sections', {
@@ -189,6 +210,8 @@ export default function SectionsManagement() {
       setDescription('');
       setVideoUrl('');
       setPdfUrl('');
+      setInstructor('marion');
+      setCommissionGroup('marion');
       setSelectedFile(null);
       if (e.target instanceof HTMLFormElement) {
         e.target.reset();
@@ -209,6 +232,8 @@ export default function SectionsManagement() {
     setDescription(section.description);
     setVideoUrl(section.videoUrl);
     setPdfUrl(section.pdfUrl || '');
+    setInstructor(section.instructor);
+    setCommissionGroup(section.commissionGroup);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -231,6 +256,8 @@ export default function SectionsManagement() {
         videoUrl,
         pdfUrl: fileUrl,
         eventId: selectedEvent,
+        instructor,
+        commissionGroup,
       };
 
       const response = await fetch(`/api/sections/${editingSection._id}`, {
@@ -253,6 +280,8 @@ export default function SectionsManagement() {
       setDescription('');
       setVideoUrl('');
       setPdfUrl('');
+      setInstructor('marion');
+      setCommissionGroup('marion');
       setSelectedFile(null);
       if (e.target instanceof HTMLFormElement) {
         e.target.reset();
@@ -326,6 +355,18 @@ export default function SectionsManagement() {
     } finally {
       setSyncingStudents(false);
     }
+  };
+
+  const handleEventSelect = (eventId: string) => {
+    setSelectedEvent(eventId);
+    setSelectedSubEvent(null); // Reset sub-event selection when changing events
+  };
+
+  const handleSubEventSelect = (subEvent: 'david' | 'marion') => {
+    setSelectedSubEvent(subEvent);
+    // Set the instructor and commissionGroup based on the selected sub-event
+    setInstructor(subEvent);
+    setCommissionGroup(subEvent);
   };
 
   if (status === 'loading') {
@@ -405,19 +446,47 @@ export default function SectionsManagement() {
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h2 className="text-xl font-semibold mb-4">Seleccionar Evento</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <button
+                  onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
+                  className={`w-full p-4 rounded-lg border ${
+                    selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <h3 className="font-medium">Evento 1</h3>
+                  <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
+                </button>
+                
+                {selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleSubEventSelect('david')}
+                      className={`p-3 rounded-lg border ${
+                        selectedSubEvent === 'david'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <h4 className="font-medium">David</h4>
+                    </button>
+                    <button
+                      onClick={() => handleSubEventSelect('marion')}
+                      className={`p-3 rounded-lg border ${
+                        selectedSubEvent === 'marion'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <h4 className="font-medium">Marion</h4>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <button
-                onClick={() => setSelectedEvent(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
-                className={`p-4 rounded-lg border ${
-                  selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
-                <h3 className="font-medium">Evento 1</h3>
-                <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
-              </button>
-              <button
-                onClick={() => setSelectedEvent(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
+                onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
                 className={`p-4 rounded-lg border ${
                   selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
                     ? 'border-blue-500 bg-blue-50'
@@ -445,6 +514,12 @@ export default function SectionsManagement() {
             {!selectedEvent && (
               <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
                 Por favor, seleccione un evento para comenzar
+              </div>
+            )}
+
+            {selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 && !selectedSubEvent && (
+              <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+                Por favor, seleccione el instructor (David o Marion) para el Evento 1
               </div>
             )}
 
@@ -555,6 +630,36 @@ export default function SectionsManagement() {
                 )}
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Instructor
+                </label>
+                <select
+                  value={instructor}
+                  onChange={(e) => setInstructor(e.target.value as 'marion' | 'david')}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                >
+                  <option value="marion">Marion</option>
+                  <option value="david">David</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Grupo de Comisión
+                </label>
+                <select
+                  value={commissionGroup}
+                  onChange={(e) => setCommissionGroup(e.target.value as 'marion' | 'david')}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                >
+                  <option value="marion">Marion</option>
+                  <option value="david">David</option>
+                </select>
+              </div>
+
               <div className="flex gap-2">
                 <button
                   type="submit"
@@ -582,6 +687,8 @@ export default function SectionsManagement() {
                       setDescription('');
                       setVideoUrl('');
                       setPdfUrl('');
+                      setInstructor('marion');
+                      setCommissionGroup('marion');
                       setSelectedFile(null);
                     }}
                     className="w-full bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
