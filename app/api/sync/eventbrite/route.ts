@@ -3,6 +3,12 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db';
 import User from '@/models/User';
 
+// IDs de las preguntas para cada evento
+const DNI_QUESTION_IDS: Record<string, string> = {
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: '287305383',
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: '287346273'
+};
+
 async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
   const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers&page_size=${pageSize}&page=${page}`;
   
@@ -76,12 +82,14 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
           for (const answer of attendee.answers) {
             console.log(`📝 Respuesta:`, {
               question_id: answer.question_id,
-              answer: answer.answer
+              answer: answer.answer,
+              question: answer.question
             });
-            if (answer.question_id === process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID) {
+            
+            // Usar el ID de pregunta específico para el evento
+            if (answer.question_id === DNI_QUESTION_IDS[eventId]) {
               documento = answer.answer;
-            } else if (answer.question_id === process.env.EVENTBRITE_COMMISSION_QUESTION_ID) {
-              commission = answer.answer;
+              console.log(`✅ DNI encontrado para ${email}: ${documento}`);
             }
           }
         }
@@ -156,10 +164,7 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
 export async function POST(request: Request) {
   try {
     console.log('\n🔄 Iniciando sincronización manual de Eventbrite');
-    console.log('🔑 Variables de entorno:', {
-      EVENTBRITE_DOCUMENTO_QUESTION_ID: process.env.EVENTBRITE_DOCUMENTO_QUESTION_ID,
-      EVENTBRITE_COMMISSION_QUESTION_ID: process.env.EVENTBRITE_COMMISSION_QUESTION_ID
-    });
+    console.log('🔑 IDs de preguntas configurados:', DNI_QUESTION_IDS);
     
     const { eventId } = await request.json();
     
@@ -167,6 +172,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ 
         status: 'error',
         message: 'Se requiere el ID del evento'
+      }, { status: 400 });
+    }
+
+    if (!DNI_QUESTION_IDS[eventId]) {
+      return NextResponse.json({ 
+        status: 'error',
+        message: 'ID de evento no válido o no configurado'
       }, { status: 400 });
     }
 
