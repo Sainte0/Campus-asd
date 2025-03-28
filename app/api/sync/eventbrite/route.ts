@@ -9,6 +9,12 @@ const DNI_QUESTION_IDS: Record<string, string> = {
   [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: '287346273'
 };
 
+// IDs de las preguntas de comisión para cada evento
+const COMMISSION_QUESTION_IDS: Record<string, string> = {
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '']: '287305384',
+  [process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '']: '287346274'
+};
+
 async function getEventAttendees(eventId: string, page: number = 1, pageSize: number = 50) {
   const url = `https://www.eventbriteapi.com/v3/events/${eventId}/attendees/?expand=profile,answers&page_size=${pageSize}&page=${page}`;
   
@@ -90,6 +96,9 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
             if (answer.question_id === DNI_QUESTION_IDS[eventId]) {
               documento = answer.answer;
               console.log(`✅ DNI encontrado para ${email}: ${documento}`);
+            } else if (answer.question_id === COMMISSION_QUESTION_IDS[eventId]) {
+              commission = answer.answer;
+              console.log(`✅ Comisión encontrada para ${email}: ${commission}`);
             }
           }
         }
@@ -164,7 +173,10 @@ async function processAttendeesBatch(attendees: any[], eventId: string) {
 export async function POST(request: Request) {
   try {
     console.log('\n🔄 Iniciando sincronización manual de Eventbrite');
-    console.log('🔑 IDs de preguntas configurados:', DNI_QUESTION_IDS);
+    console.log('🔑 IDs de preguntas configurados:', {
+      dni: DNI_QUESTION_IDS,
+      commission: COMMISSION_QUESTION_IDS
+    });
     
     const { eventId } = await request.json();
     
