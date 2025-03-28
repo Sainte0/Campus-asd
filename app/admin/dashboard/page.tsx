@@ -187,23 +187,25 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <button
                       onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1 || '')}
-                      className={`w-full p-3 rounded-lg border ${selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
+                      className={`w-full p-3 rounded-lg border ${
+                        selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-300'
-                        }`}
+                      }`}
                     >
-                      <h4 className="font-medium">Evento 1</h4>
+                      <h4 className="font-medium">Campus Presencial</h4>
                       <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_1}</p>
                     </button>
 
                     <button
                       onClick={() => handleEventSelect(process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2 || '')}
-                      className={`w-full p-3 rounded-lg border ${selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
+                      className={`w-full p-3 rounded-lg border ${
+                        selectedEvent === process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-300'
-                        }`}
+                      }`}
                     >
-                      <h4 className="font-medium">Evento 2</h4>
+                      <h4 className="font-medium">Campus Libre</h4>
                       <p className="text-sm text-gray-600">ID: {process.env.NEXT_PUBLIC_EVENTBRITE_EVENT_ID_2}</p>
                     </button>
                   </div>
