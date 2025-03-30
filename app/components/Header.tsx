@@ -42,14 +42,7 @@ export function Header() {
                 Campus Virtual
               </h2>
             </div>
-            <div className="flex items-center space-x-4">
-              <a href="#" className="text-white hover:text-white/80 transition">
-                Soporte
-              </a>
-              <a href="#" className="text-white hover:text-white/80 transition">
-                Contacto
-              </a>
-            </div>
+            
           </div>
         </div>
       </div>

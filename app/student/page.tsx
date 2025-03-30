@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Header } from '../components/Header';
-import { Footer } from '../components/Footer';
+import Footer from '../components/Footer';
 
 interface Section {
   _id: string;
