@@ -25,7 +25,24 @@ interface PaginationInfo {
 
 function getYouTubeEmbedUrl(url: string) {
   try {
-    const videoId = url.split('v=')[1]?.split('&')[0];
+    // Handle standard YouTube URLs (watch?v=)
+    let videoId = url.split('v=')[1]?.split('&')[0];
+    
+    if (!videoId) {
+      // Handle youtu.be URLs
+      videoId = url.split('youtu.be/')[1]?.split('?')[0];
+    }
+    
+    if (!videoId) {
+      // Handle embed URLs
+      videoId = url.split('embed/')[1]?.split('?')[0];
+    }
+    
+    if (!videoId) {
+      // Handle shorts URLs
+      videoId = url.split('shorts/')[1]?.split('?')[0];
+    }
+
     return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
   } catch {
     return null;
