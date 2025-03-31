@@ -17,6 +17,7 @@ export default function AdminDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -106,6 +107,42 @@ export default function AdminDashboard() {
       setError(error instanceof Error ? error.message : 'Error al eliminar estudiantes');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleDownloadEmails = async () => {
+    if (!selectedEvent) {
+      toast.error('Por favor, seleccione un evento primero');
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      const response = await fetch(`/api/students/export?eventId=${selectedEvent}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al descargar la lista de emails');
+      }
+
+      // Crear un blob con la respuesta
+      const blob = await response.blob();
+      
+      // Crear un enlace temporal y hacer clic en él
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `estudiantes-${selectedEvent}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Lista de emails descargada exitosamente');
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al descargar la lista de emails');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -220,6 +257,17 @@ export default function AdminDashboard() {
                     }`}
                 >
                   {syncing ? 'Sincronizando...' : 'Sincronizar Ahora'}
+                </button>
+
+                <button
+                  onClick={handleDownloadEmails}
+                  disabled={downloading || !selectedEvent}
+                  className={`mt-4 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${downloading || !selectedEvent
+                      ? 'bg-green-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                    }`}
+                >
+                  {downloading ? 'Descargando...' : 'Descargar Lista de Emails'}
                 </button>
 
                 {syncResult && (
