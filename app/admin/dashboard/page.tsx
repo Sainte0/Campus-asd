@@ -211,6 +211,18 @@ export default function AdminDashboard() {
               </div>
             </Link>
 
+            <Link
+              href="/admin/reset-password"
+              className="bg-white overflow-hidden shadow-sm rounded-lg hover:shadow-md transition-shadow duration-200"
+            >
+              <div className="p-6">
+                <h2 className="text-xl font-semibold mb-2">Restablecer Contraseñas</h2>
+                <p className="text-gray-600">
+                  Actualizar contraseñas de estudiantes
+                </p>
+              </div>
+            </Link>
+
             <div className="bg-white overflow-hidden shadow-sm rounded-lg">
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-2">Sincronizar Estudiantes</h2>

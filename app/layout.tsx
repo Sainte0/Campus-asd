@@ -24,6 +24,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Toaster position="top-center" />
         <RootLayoutClient>{children}</RootLayoutClient>
+        <Analytics />
       </body>
     </html>
   );
