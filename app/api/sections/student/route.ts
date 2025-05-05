@@ -84,6 +84,14 @@ export async function GET() {
       .sort({ weekNumber: 1 })
       .toArray();
 
+    // Verificar si hay secciones
+    if (!sections || sections.length === 0) {
+      return NextResponse.json(
+        { error: 'No se encontraron secciones para este estudiante' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ sections });
   } catch (error) {
     console.error('Error al obtener secciones del estudiante:', error);

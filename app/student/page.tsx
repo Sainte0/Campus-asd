@@ -89,8 +89,6 @@ export default function StudentDashboard() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo | null>(null);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -117,44 +115,6 @@ export default function StudentDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-  };
-
-  const renderPagination = () => {
-    if (!paginationInfo || paginationInfo.pages <= 1) return null;
-
-    return (
-      <div className="flex justify-center mt-8 space-x-2">
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className={`px-4 py-2 rounded ${
-            currentPage === 1
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
-          }`}
-        >
-          Anterior
-        </button>
-        <span className="px-4 py-2">
-          Página {currentPage} de {paginationInfo.pages}
-        </span>
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === paginationInfo.pages}
-          className={`px-4 py-2 rounded ${
-            currentPage === paginationInfo.pages
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
-          }`}
-        >
-          Siguiente
-        </button>
-      </div>
-    );
   };
 
   if (status === 'loading') {
@@ -289,7 +249,6 @@ export default function StudentDashboard() {
               })}
             </div>
           )}
-          {renderPagination()}
         </div>
       </main>
 
